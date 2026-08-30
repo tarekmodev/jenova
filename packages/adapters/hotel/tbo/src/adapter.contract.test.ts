@@ -64,19 +64,28 @@ describeHotelAdapterContract(makeAdapter, {
         ? { ...request, clientReference: `JENOVA-M1-TBO-LIVE-${Date.now()}` }
         : request;
     },
+    // Declared capability (#74 L2), from recorded evidence: TBO's
+    // BookingDetail response carries no ClientReferenceId — only the Book
+    // response echoes it (verified on the recorded live booking of
+    // 2026-08-30; README "Idempotency"). The engine keeps its own copy.
+    retrieveEchoesClientReference: false,
   },
   errorScenarios: {
-    // sold_out is replay-only: the recorded driver (PreBook of an expired
-    // BookingCode → TBO 201 "No Available rooms") is not deterministic
-    // live — the sandbox intermittently re-validates old codes — so the
-    // live run carries it as a todo rather than flaking (see README.md).
-    ...(LIVE
-      ? {}
-      : {
-          sold_out: {
-            run: (adapter, ctx) => adapter.check(ctx, makeExpiredOfferToken()),
-          } satisfies HotelErrorScenario,
-        }),
+    // sold_out is driven on recordings; live it is certified on the recorded
+    // evidence. The driver (PreBook of a stale BookingCode → TBO 201 "No
+    // Available rooms") is not deterministic live: the sandbox's answer for
+    // the same stale code drifts — 201 was captured live 2026-08-30, and
+    // 3/3 deliberate live probes on 2026-08-31 answered 315 "Session
+    // Expired" instead (README error-taxonomy table). A live drive would
+    // flake, so the live run declares the recorded 201 as its basis.
+    sold_out: LIVE
+      ? {
+          evidenceBasis:
+            "TBO 201 'No Available rooms' on PreBook, captured live 2026-08-30 (committed recording; replayed as a PASS in the recorded run above). Live reproduction is unreliable: the sandbox answers 201 or 315 for the same stale BookingCode depending on session state — 3/3 probes on 2026-08-31 returned 315. See README.md and docs/certification/tbo-submission.md.",
+        }
+      : ({
+          run: (adapter, ctx) => adapter.check(ctx, makeExpiredOfferToken()),
+        } satisfies HotelErrorScenario),
     price_changed: {
       // A dead rate GUID: TBO 315 "Session Expired or doesn't exist"
       // (recorded live; deterministic in both modes) — the priced offer is
@@ -114,7 +123,14 @@ describeHotelAdapterContract(makeAdapter, {
         );
       },
     },
-    // rate_limited: intentionally absent (contract todo) — driving the
-    // sandbox into 429 would violate look-to-book; see README.md.
+    // rate_limited: never driven — deliberately forcing the sandbox into
+    // 429 would hammer it, and look-to-book is a commercial obligation
+    // (CLAUDE.md rule 5). The mapping is mechanism-verified instead at the
+    // transport seam (errors.test.ts): an HTTP 429 status is transport
+    // structure, not a fabricated supplier payload.
+    rate_limited: {
+      evidenceBasis:
+        "mechanism-verified: HTTP 429 at the transport seam maps to SupplierError(rate_limited) (errors.test.ts) and the shared client retries 429 with backoff (supplier-sdk transport tests). Deliberate live reproduction would violate look-to-book; neither the sandbox sessions nor TBO's Postman collection document a 429 body shape, so the status code is the whole contract.",
+    },
   },
 });

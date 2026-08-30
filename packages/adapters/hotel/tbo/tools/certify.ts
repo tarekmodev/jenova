@@ -66,6 +66,17 @@ function runSuite(live: boolean): CertificationCheck[] {
 
 function toCheck(assertion: VitestAssertion): CertificationCheck {
   const inLifecycle = assertion.ancestorTitles.some((t) => t.includes("lifecycle happy path"));
+  // Declared evidence (harness `HotelErrorEvidence`): registered skipped —
+  // it did not execute — and reported as EVIDENCE with the basis verbatim.
+  const evidenceMatch = /^evidence: (\w+) — (.+)$/.exec(assertion.title);
+  if (evidenceMatch !== null) {
+    return {
+      id: `error.${evidenceMatch[1] ?? "check"}`,
+      title: `evidence: ${evidenceMatch[1] ?? "check"}`,
+      status: "evidence",
+      detail: evidenceMatch[2] ?? "",
+    };
+  }
   const kindMatch =
     /SupplierError\((\w+)\)/.exec(assertion.title) ??
     /record this scenario first: (\w+)/.exec(assertion.title);

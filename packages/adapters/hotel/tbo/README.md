@@ -49,7 +49,7 @@ the live sandbox on 2026-08-30:
 |------------|----------------------|-------------|-------------------|
 | Status 200 | `Success` / `Successful` | (ok) | every happy-path recording |
 | Status 201 on `search` | `No Available rooms for given criteria` | **empty result** `[]` | unknown hotel code 999999999 |
-| Status 201 on `PreBook` | `No Available rooms for given criteria` | `sold_out` | expired BookingCode (TBO does not distinguish expiry from sold-out; the sandbox intermittently RE-VALIDATES old codes, so this scenario is recorded-only in the contract suite — live it appears as a todo) |
+| Status 201 on `PreBook` | `No Available rooms for given criteria` | `sold_out` | stale BookingCode, captured live 2026-08-30 (TBO does not distinguish expiry from sold-out). NOT deterministically reproducible live: the sandbox's answer for the same stale code drifts between 201 and 315 with session state — 3/3 deliberate probes on 2026-08-31 answered 315 — so the contract suite drives it on the recording and the live certification run declares the recording as its evidence basis (EVIDENCE, not a todo) |
 | Status 315 | `Session Expired or doesn't exist` | `price_changed` | PreBook of a dead rate GUID — the priced offer is gone and must be re-priced (deterministic live and recorded) |
 | Status 400 | `Invalid date entered. CheckIn date should be less than CheckOut date.` | `invalid_request` | reversed date range |
 | Status 400 | `Booking does not exist for the requested input` | `invalid_request` | BookingDetail for unknown confirmation |
@@ -57,7 +57,7 @@ the live sandbox on 2026-08-30:
 | Status 479 | `No Itinerary exist for this input` | `supplier_rejected` | Cancel for unknown confirmation |
 | price/policy drift on `check` | PreBook fare or normalized policy ≠ priced snapshot in the offer token | `price_changed` | comparison against the real PreBook recording |
 | deadline exhausted / transport abort | — | `supplier_timeout` | transport-level, no payload involved |
-| HTTP 429 / Status 429 | *never observed* | `rate_limited` | **not reachable deliberately** — forcing a 429 would hammer the sandbox and look-to-book is a commercial obligation; the mapping is wired, the contract scenario stays a todo until a real 429 is ever captured (e.g. by the weekly drift job) |
+| HTTP 429 / Status 429 | *never observed* | `rate_limited` | **not reachable deliberately** — forcing a 429 would hammer the sandbox and look-to-book is a commercial obligation. Mechanism-verified instead: an HTTP 429 at the transport seam maps to `rate_limited` (errors.test.ts) and the shared client retries 429 with backoff (supplier-sdk transport tests). The check is structural (a status code, empty body) — no supplier payload is fabricated (rule 5); neither the sandbox sessions nor TBO's Postman collection document a 429 body shape. The contract suite declares this as the scenario's evidence basis; a real capture (e.g. from the weekly drift job) would upgrade it to a recording |
 | any other Status code | — | `supplier_rejected` | fallback: the supplier answered and refused |
 
 Unknown `BookingStatus` vocabulary on BookingDetail fails loudly as
@@ -95,7 +95,9 @@ Unknown `BookingStatus` vocabulary on BookingDetail fails loudly as
 - **Idempotency.** `clientReference` → `ClientReferenceId` **and**
   `BookingReferenceId`. TBO echoes `ClientReferenceId` on the Book response
   (verified live). `BookingDetail` does **not** echo it — retrieve records
-  carry `clientReference: ""` and the engine keeps its own copy.
+  carry `clientReference: ""` and the engine keeps its own copy. Declared to
+  the contract harness as `retrieveEchoesClientReference: false`, so the
+  suite asserts the declaration instead of inferring from values.
 - **Async cancellation.** `Cancel` answers `200 "Cancelled"`, then
   `BookingDetail` reports `CancellationInProgress` until it settles —
   mapped to `pending`; the engine's polling worker owns the settle watch.
