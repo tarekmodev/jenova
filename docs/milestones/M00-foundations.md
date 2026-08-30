@@ -16,7 +16,7 @@ test it, and ship a reviewed PR to staging — unaided.
       Booking, BookingItem, LedgerAccount, JournalEntry, AuditEvent, Offer);
       **per-tenant database provisioning** + **fan-out migration runner** with dry-run,
       per-tenant failure isolation, resume; tenant connection resolver (the only door).
-- [ ] `supplier-sdk` package: HotelSupplierAdapter interface + AdapterCallContext +
+- [x] `supplier-sdk` package: HotelSupplierAdapter interface + AdapterCallContext +
       credentials types; transport codecs skeleton (retrying HTTP client with deadline
       budgets + circuit breaker; JSON codec; XML/SOAP codec with schema validation);
       contract-test harness skeleton.
