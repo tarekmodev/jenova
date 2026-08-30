@@ -203,6 +203,9 @@ export class HotelBookingService {
       net: offer.net,
       sell: offer.sell,
       policySnapshot: policy,
+      // Durable snapshot for documents/delivery (0005): after book() returns
+      // this is the only home the holder's email and guest names have.
+      guests: { holder: input.holder, rooms: input.rooms },
       actor: input.actor,
     });
     if (!created.created) {

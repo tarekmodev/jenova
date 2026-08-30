@@ -83,6 +83,13 @@ export interface IssueOfferInput {
   readonly occupancy: readonly OfferRoomOccupancy[];
   /** Context the markup resolution ran with — replayed on `check` re-price. */
   readonly pricingContext: PricingContext;
+  /**
+   * Hotel display facts from the supplier payload (0005): canonical
+   * BoardBasis + verbatim room name — documents render what was sold from
+   * these. Optional so non-hotel verticals can omit them.
+   */
+  readonly boardBasis?: string | null;
+  readonly supplierRoomName?: string | null;
 }
 
 /** What clients get back: the token IS the offer. */
@@ -230,6 +237,8 @@ export class OffersService {
       breakdown: offer.breakdown,
       pricingContext: input.pricingContext,
       checkedAt,
+      boardBasis: input.boardBasis ?? null,
+      supplierRoomName: input.supplierRoomName ?? null,
     });
   }
 

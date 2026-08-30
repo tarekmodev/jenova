@@ -11,6 +11,7 @@
 import { Module } from "@nestjs/common";
 import { AgencyAuthModule } from "./auth/agency-auth.module";
 import { ConfigModule } from "./config/config.module";
+import { DocumentsModule } from "./documents/documents.module";
 import { GatewayModule } from "./gateway/gateway.module";
 import { HotelBookingModule } from "./hotel-booking/hotel-booking.module";
 import { HotelContentModule } from "./hotel-content/hotel-content.module";
@@ -36,6 +37,7 @@ import { HTTP_SERVER_HOOKS, noopHttpServerHooks } from "./observability/instrume
     HotelSearchModule,
     HotelContentModule,
     HotelBookingModule,
+    DocumentsModule,
   ],
   controllers: [HealthController],
   providers: [

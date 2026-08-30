@@ -139,6 +139,29 @@ export interface OfferRoomOccupancy {
   readonly childAges: readonly number[];
 }
 
+/** One named guest inside a booking item's guests snapshot (0005). */
+export interface BookingGuest {
+  readonly firstName: string;
+  readonly lastName: string;
+  /** Age in years at check-in; present for children only. */
+  readonly age?: number;
+}
+
+/**
+ * Holder + per-room guest names captured at booking creation (0005) — the
+ * only place this data survives after the supplier call: vouchers and
+ * delivery need the names and the holder's email long after book().
+ */
+export interface BookingGuestsSnapshot {
+  readonly holder: {
+    readonly firstName: string;
+    readonly lastName: string;
+    readonly email: string;
+    readonly phone: string;
+  };
+  readonly rooms: readonly { readonly guests: readonly BookingGuest[] }[];
+}
+
 /**
  * Short-lived server-priced result — the ONLY bookable thing (CLAUDE.md
  * rule 8). Carries the signed price hash, TTL expiry, and the id of the
@@ -170,6 +193,11 @@ export const offers = pgTable("offer", {
   pricingContext: jsonb("pricing_context").$type<Record<string, unknown>>(),
   checkedAt: timestamp("checked_at", { withTimezone: true, mode: "date" }),
   invalidatedAt: timestamp("invalidated_at", { withTimezone: true, mode: "date" }),
+  // 0005 documents columns (expand-only): hotel display facts captured from
+  // the supplier's search/check payload at issue time — the voucher's source
+  // of truth for what was sold. Nullable: pre-0005 offers never carried them.
+  boardBasis: text("board_basis"),
+  supplierRoomName: text("supplier_room_name"),
 });
 
 /**
@@ -228,6 +256,8 @@ export const bookingItems = pgTable(
     nextPollAt: timestamp("next_poll_at", { withTimezone: true, mode: "date" }),
     escalatedAt: timestamp("escalated_at", { withTimezone: true, mode: "date" }),
     escalationReason: text("escalation_reason"),
+    // 0005 documents column (expand-only): holder + guest names snapshot.
+    guests: jsonb("guests").$type<BookingGuestsSnapshot>(),
   },
   (t) => [index("booking_item_booking_ix").on(t.bookingId)],
 );
@@ -291,6 +321,75 @@ export const journalEntries = pgTable(
     index("journal_entry_group_ix").on(t.transactionGroupId),
     index("journal_entry_account_ix").on(t.accountId),
   ],
+);
+
+export const DOCUMENT_KINDS = ["hotel_voucher"] as const;
+export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
+
+export const DOCUMENT_DELIVERY_STATES = ["pending", "sent", "failed"] as const;
+export type DocumentDeliveryState = (typeof DOCUMENT_DELIVERY_STATES)[number];
+
+export const DOCUMENT_DELIVERY_CHANNELS = ["email"] as const;
+export type DocumentDeliveryChannel = (typeof DOCUMENT_DELIVERY_CHANNELS)[number];
+
+/**
+ * One rendered artifact per (booking item, kind, locale) — 0005. The bytes
+ * live in the object store under `storageKey`; `contentSha256` pins them
+ * for audit and byte-stability checks. Re-rendering replaces the pointer.
+ */
+export const documents = pgTable(
+  "document",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => bookings.id, { onDelete: "cascade" }),
+    bookingItemId: uuid("booking_item_id")
+      .notNull()
+      .references(() => bookingItems.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<DocumentKind>().notNull(),
+    locale: text("locale").notNull(),
+    storageKey: text("storage_key").notNull(),
+    contentSha256: text("content_sha256").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("document_item_kind_locale_key").on(t.bookingItemId, t.kind, t.locale),
+    index("document_booking_ix").on(t.bookingId),
+  ],
+);
+
+/**
+ * Delivery bookkeeping for the worker's confirm-event consumer — 0005. One
+ * row per consumed booking_event (the UNIQUE claim is the at-least-once
+ * dedup). Retries with backoff live here; terminal failure flips state to
+ * 'failed' AND escalates the booking item into the manual queue.
+ */
+export const documentDeliveries = pgTable(
+  "document_delivery",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingEventId: uuid("booking_event_id")
+      .notNull()
+      .unique()
+      .references(() => bookingEvents.id, { onDelete: "cascade" }),
+    bookingItemId: uuid("booking_item_id")
+      .notNull()
+      .references(() => bookingItems.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id").references(() => documents.id, { onDelete: "set null" }),
+    channel: text("channel").$type<DocumentDeliveryChannel>().notNull(),
+    recipient: text("recipient").notNull(),
+    state: text("state").$type<DocumentDeliveryState>().notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true, mode: "date" }),
+    lastError: text("last_error"),
+    sentAt: timestamp("sent_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [index("document_delivery_item_ix").on(t.bookingItemId)],
 );
 
 /** Append-only audit trail: insert-only at the database level. */

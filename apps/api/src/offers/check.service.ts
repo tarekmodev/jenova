@@ -279,6 +279,10 @@ export class OfferCheckService {
         nationality: offer.nationality,
         occupancy: offer.occupancy,
         pricingContext: offer.pricingContext,
+        // The successor carries the CHECKED payload's display facts — the
+        // supplier's current truth about what is being sold (0005).
+        boardBasis: checked.boardBasis,
+        supplierRoomName: checked.supplierRoomName,
       },
       checkedAt,
     );

@@ -17,8 +17,11 @@ submitted.
 - [x] **Agent Portal alpha** (`apps/portal-agent`): agency login, streaming hotel search
       (SSE), offer detail with normalized cancellation policy, check→book flow, booking
       list/detail, cancellation with fee preview.
-- [ ] **Documents v1** (`api/documents`): bilingual voucher PDF (Typst), branded per
-      tenant; email delivery (mailpit in dev).
+- [x] **Documents v1** (`api/documents`): bilingual voucher PDF (Typst), branded per
+      tenant; email delivery (mailpit in dev). (Typst 0.15 passed the Arabic/RTL
+      evaluation — shaping, bidi, RTL tables — so no Playwright fallback; worker
+      consumes `booking_item.confirmed` outbox events → voucher → email, with
+      backoff retries and terminal-failure escalation into the manual queue.)
 - [ ] **Platform Admin v1** (`apps/platform-admin`, separate realm): tenant list +
       provisioning, app entitlement switchboard, supplier catalog with certification
       status, health page.

@@ -26,7 +26,8 @@ export const TENANT_DB_RESOLVER = Symbol("jenova.api.tenantDbResolver");
 /**
  * Nest injection token for the process-wide control-plane client — the SAME
  * client the resolver reads (one pool). Control-plane data only (tenant
- * directory, tenant branding); tenant data goes through the resolver.
+ * directory, tenant branding, documents' Tenant-row reads); tenant data
+ * goes through the resolver.
  */
 export const CONTROL_PLANE_CLIENT = Symbol("jenova.api.controlPlaneClient");
 

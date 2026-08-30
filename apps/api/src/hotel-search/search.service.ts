@@ -418,6 +418,8 @@ export class HotelSearchService {
         nationality: request.nationality,
         occupancy: query.rooms,
         pricingContext,
+        boardBasis: offer.boardBasis,
+        supplierRoomName: offer.supplierRoomName,
       });
       summaries.push({
         offerId: issued.offerId,
