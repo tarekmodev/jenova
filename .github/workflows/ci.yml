@@ -37,4 +37,4 @@ jobs:
         run: pnpm test
 
       - name: migration-fanout-dry-run
-        run: echo "pending @jenova/db (issue #3)"
+        run: 'echo "pending @jenova/db (issue #3)"'
