@@ -17,7 +17,7 @@ recorded traffic powering CI. No UI yet beyond API endpoints.
       most-specific-wins MarkupRule resolution; fired-rule id stored on Offer;
       property-based tests (never negative margin unless rule explicitly allows, VAT
       breakdown correctness, FX with stored rate + buffer).
-- [ ] **Offer store**: TTL cache + signed price hash; `check` revalidation flow with
+- [x] **Offer store**: TTL cache + signed price hash; `check` revalidation flow with
       price-delta surfacing.
 - [ ] **Booking engine** (`api/hotel-booking`): BookingItem state machine runner —
       atomic transition = validate legality + persist + ledger postings + AuditEvent +

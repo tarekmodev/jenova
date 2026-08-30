@@ -44,6 +44,14 @@ export function isOfferError(value: unknown): value is OfferError {
   return value instanceof OfferError;
 }
 
+/** No adapter is deployed for this supplier code (e.g. not yet merged). */
+export class SupplierUnavailableError extends Error {
+  constructor(readonly supplierCode: string) {
+    super(`no adapter is available for supplier ${supplierCode}`);
+    this.name = "SupplierUnavailableError";
+  }
+}
+
 const OFFER_ERROR_STATUS: Readonly<Record<OfferErrorKind, HttpStatus>> = {
   offer_not_found: HttpStatus.NOT_FOUND,
   offer_expired: HttpStatus.GONE,
@@ -70,6 +78,13 @@ const SUPPLIER_ERROR_STATUS: Readonly<Record<SupplierErrorKind, { code: string; 
 export function toOfferHttpError(error: unknown): ApiHttpError {
   if (isOfferError(error)) {
     return new ApiHttpError(error.kind, error.message, OFFER_ERROR_STATUS[error.kind]);
+  }
+  if (error instanceof SupplierUnavailableError) {
+    return new ApiHttpError(
+      "supplier_unavailable",
+      "this supplier is not available right now",
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
   }
   if (isSupplierError(error)) {
     const mapped = SUPPLIER_ERROR_STATUS[error.kind];
