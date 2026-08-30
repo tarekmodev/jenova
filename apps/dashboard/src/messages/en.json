@@ -15,6 +15,43 @@
       "internal_error": "Sign-in failed — please try again"
     }
   },
+  "nav": {
+    "sections": {
+      "workspace": "Workspace",
+      "apps": "Apps",
+      "settings": "Settings"
+    },
+    "bookings": "Bookings",
+    "queue": "Intervention queue",
+    "searchConsole": "Search console",
+    "users": "Users & roles",
+    "suppliers": "Supplier accounts",
+    "branding": "Branding",
+    "account": "My account",
+    "app": {
+      "b2b": "B2B",
+      "corporate": "Corporate",
+      "finance": "Finance",
+      "api_access": "API access",
+      "storefront": "Storefront",
+      "crm": "CRM",
+      "desk": "Desk",
+      "contracting": "Contracting"
+    }
+  },
+  "shell": {
+    "collapseNav": "Collapse navigation",
+    "openNav": "Open navigation",
+    "accountSettings": "Account settings",
+    "logout": "Sign out"
+  },
+  "forbidden": {
+    "title": "App not installed",
+    "description": "This app is not enabled for your company. Contact your administrator."
+  },
+  "appSection": {
+    "placeholder": "This app is installed. Its dashboard section arrives with its milestone."
+  },
   "roles": {
     "admin": "Administrator",
     "operations": "Operations",

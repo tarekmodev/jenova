@@ -14,6 +14,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.factory";
+import { ENTITLEMENT_READER } from "../src/auth/me.controller";
 import { hashPassword } from "../src/auth/password";
 import { SESSION_SERVICE, type SessionService } from "../src/auth/session-service";
 import { InMemoryStaffUserStore, STAFF_USER_STORE } from "../src/auth/staff-users";
@@ -67,6 +68,11 @@ describe("tenant-staff auth e2e", () => {
       .useValue(testDirectory)
       .overrideProvider(STAFF_USER_STORE)
       .useValue(store)
+      .overrideProvider(ENTITLEMENT_READER)
+      .useValue({
+        installedApps: () => Promise.resolve(["b2b", "finance"]),
+        isInstalled: () => Promise.resolve(true),
+      })
       .compile();
     app = testingModule.createNestApplication();
     configureApp(app);
@@ -218,6 +224,22 @@ describe("tenant-staff auth e2e", () => {
     } finally {
       await store.setPolicy(KNOWN_TENANT, { enforceTotp: false });
     }
+  });
+
+  it("serves the tenant's installed apps to staff sessions only", async () => {
+    const res = await login({ email: adminEmail, password: PASSWORD }).expect(200);
+    const token = (res.body as { token: string }).token;
+    const entitlements = await request(app.getHttpServer())
+      .get("/me/entitlements")
+      .set("Host", KNOWN_HOST)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+    expect(entitlements.body).toEqual({ installed: ["b2b", "finance"] });
+
+    await request(app.getHttpServer())
+      .get("/me/entitlements")
+      .set("Host", KNOWN_HOST)
+      .expect(401);
   });
 
   it("refuses login on an unknown host (tenant resolution first)", async () => {

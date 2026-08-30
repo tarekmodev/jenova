@@ -4,9 +4,12 @@ import type { ControlPlaneClient } from "@jenova/db";
 import { AuthModule } from "../auth/auth.module";
 import { MACHINE_AUTH, type MachineCredentialVerifier } from "../auth/machine-auth";
 import { SESSION_SERVICE, type SessionVerifier } from "../auth/session-service";
-import { ControlPlaneTenantDirectory } from "../tenancy/control-plane-directory";
+import {
+  ControlPlaneEntitlementSource,
+  ControlPlaneTenantDirectory,
+} from "../tenancy/control-plane-directory";
 import { CONTROL_PLANE_CLIENT, TenantDbModule } from "../tenancy/tenant-db.module";
-import { DenyAllEntitlementSource, ENTITLEMENT_SOURCE, type EntitlementSource } from "./entitlement-source";
+import { ENTITLEMENT_SOURCE, type EntitlementSource } from "./entitlement-source";
 import { ErrorEnvelopeFilter } from "./error-envelope.filter";
 import { GatewayGuard } from "./gateway.guard";
 import { NoopRateLimiter, RATE_LIMITER, type RateLimiter } from "./rate-limiter";
@@ -37,7 +40,14 @@ import { TENANT_DIRECTORY, type TenantDirectory } from "./tenant-directory";
       useFactory: (controlPlane: ControlPlaneClient) =>
         new ControlPlaneTenantDirectory(controlPlane),
     },
-    { provide: ENTITLEMENT_SOURCE, useClass: DenyAllEntitlementSource },
+    {
+      // @RequiresApp routes check the same AppInstallation flags the
+      // dashboard's nav reads — the api refuses what the UI merely hides.
+      provide: ENTITLEMENT_SOURCE,
+      inject: [CONTROL_PLANE_CLIENT],
+      useFactory: (controlPlane: ControlPlaneClient) =>
+        new ControlPlaneEntitlementSource(controlPlane),
+    },
     { provide: RATE_LIMITER, useClass: NoopRateLimiter },
     {
       provide: GATEWAY_PIPELINE,

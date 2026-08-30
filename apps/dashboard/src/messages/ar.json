@@ -15,6 +15,43 @@
       "internal_error": "تعذر تسجيل الدخول — حاول مرة أخرى"
     }
   },
+  "nav": {
+    "sections": {
+      "workspace": "مساحة العمل",
+      "apps": "التطبيقات",
+      "settings": "الإعدادات"
+    },
+    "bookings": "الحجوزات",
+    "queue": "قائمة التدخل اليدوي",
+    "searchConsole": "وحدة البحث",
+    "users": "المستخدمون والأدوار",
+    "suppliers": "حسابات الموردين",
+    "branding": "الهوية التجارية",
+    "account": "حسابي",
+    "app": {
+      "b2b": "وكلاء B2B",
+      "corporate": "الشركات",
+      "finance": "المالية",
+      "api_access": "الوصول البرمجي API",
+      "storefront": "المتجر الإلكتروني",
+      "crm": "إدارة العملاء CRM",
+      "desk": "مكتب الدعم",
+      "contracting": "التعاقدات"
+    }
+  },
+  "shell": {
+    "collapseNav": "طي القائمة",
+    "openNav": "فتح القائمة",
+    "accountSettings": "إعدادات الحساب",
+    "logout": "تسجيل الخروج"
+  },
+  "forbidden": {
+    "title": "التطبيق غير مثبت",
+    "description": "هذا التطبيق غير مفعّل لمنشأتك. تواصل مع مدير النظام."
+  },
+  "appSection": {
+    "placeholder": "هذا التطبيق مثبت، وستصل واجهته في مرحلته من خطة البناء."
+  },
   "roles": {
     "admin": "مدير",
     "operations": "العمليات",

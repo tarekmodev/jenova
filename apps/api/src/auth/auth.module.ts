@@ -10,11 +10,16 @@
  */
 
 import { Module } from "@nestjs/common";
-import type { TenantDbResolver } from "@jenova/db";
+import type { ControlPlaneClient, TenantDbResolver } from "@jenova/db";
 import { API_CONFIG, type ApiConfig } from "../config/config";
 import { ConfigModule } from "../config/config.module";
+import { ControlPlaneEntitlementSource } from "../tenancy/control-plane-directory";
 import { secretBoxFromConfig, SECRET_BOX, type SecretBox } from "../tenancy/secret-box";
-import { TENANT_DB_RESOLVER, TenantDbModule } from "../tenancy/tenant-db.module";
+import {
+  CONTROL_PLANE_CLIENT,
+  TENANT_DB_RESOLVER,
+  TenantDbModule,
+} from "../tenancy/tenant-db.module";
 import {
   InMemoryMachineKeyStore,
   MACHINE_AUTH,
@@ -24,6 +29,7 @@ import {
 } from "./machine-auth";
 import { SESSION_SERVICE, SessionService } from "./session-service";
 import { InMemorySessionStore, SESSION_STORE, type SessionStore } from "./session-store";
+import { ENTITLEMENT_READER, MeController } from "./me.controller";
 import { StaffAuthController } from "./staff-auth.controller";
 import { STAFF_AUTH_SERVICE, StaffAuthService } from "./staff-auth.service";
 import { DrizzleStaffUserStore, STAFF_USER_STORE, type StaffUserStore } from "./staff-users";
@@ -39,7 +45,7 @@ export const TOTP_VERIFIER = Symbol("jenova.api.totpVerifier");
 
 @Module({
   imports: [ConfigModule, TenantDbModule],
-  controllers: [StaffAuthController],
+  controllers: [StaffAuthController, MeController],
   providers: [
     { provide: SESSION_STORE, useClass: InMemorySessionStore },
     {
@@ -70,6 +76,12 @@ export const TOTP_VERIFIER = Symbol("jenova.api.totpVerifier");
       useFactory: (resolver: TenantDbResolver) => new DrizzleStaffUserStore(resolver),
     },
     {
+      provide: ENTITLEMENT_READER,
+      inject: [CONTROL_PLANE_CLIENT],
+      useFactory: (controlPlane: ControlPlaneClient) =>
+        new ControlPlaneEntitlementSource(controlPlane),
+    },
+    {
       provide: STAFF_AUTH_SERVICE,
       inject: [STAFF_USER_STORE, SESSION_SERVICE, TOTP_VERIFIER, SECRET_BOX],
       useFactory: (
@@ -90,6 +102,7 @@ export const TOTP_VERIFIER = Symbol("jenova.api.totpVerifier");
     SECRET_BOX,
     STAFF_USER_STORE,
     STAFF_AUTH_SERVICE,
+    ENTITLEMENT_READER,
   ],
 })
 export class AuthModule {}
