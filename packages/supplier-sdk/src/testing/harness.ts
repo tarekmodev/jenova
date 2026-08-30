@@ -115,6 +115,13 @@ export interface HotelHappyPathScenario {
    */
   readonly pickOffer?: (offers: readonly HotelOffer[]) => HotelOffer;
   readonly makeBookRequest: (checkedOffer: HotelOffer) => HotelBookRequest;
+  /**
+   * Whether this supplier's retrieve surface returns the clientReference it
+   * was given at book time. Adapters DECLARE this capability from recorded
+   * evidence (review #74 L2) — the harness asserts the declaration both
+   * ways and never infers behavior from whatever value came back.
+   */
+  readonly retrieveEchoesClientReference: boolean;
 }
 
 /** Drives the adapter into one recorded failure and returns its rejecting call. */
@@ -122,13 +129,28 @@ export interface HotelErrorScenario {
   readonly run: (adapter: HotelSupplierAdapter, ctx: AdapterCallContext) => Promise<unknown>;
 }
 
+/**
+ * Declares a kind certified on standing evidence instead of being driven in
+ * this run: committed real recordings, or a mechanism test at the transport
+ * layer — cited in `evidenceBasis`, which the certification report renders
+ * verbatim. The harness registers it as a skipped check titled
+ * `evidence: <kind> — <basis>` so the report shows EVIDENCE, never a
+ * fabricated PASS (the check did not execute in this mode).
+ */
+export interface HotelErrorEvidence {
+  readonly evidenceBasis: string;
+}
+
+/** A kind is either driven (`run`) or declared evidence-backed for this mode. */
+export type HotelErrorScenarioEntry = HotelErrorScenario | HotelErrorEvidence;
+
 export interface HotelAdapterContractOptions {
   readonly supplierCode: string;
   /** Fresh per-test context (deadline in the future, recorded credentials env). */
   readonly makeContext?: () => AdapterCallContext;
   readonly happyPath?: HotelHappyPathScenario;
   /** One recorded scenario per SupplierErrorKind; missing kinds become todos. */
-  readonly errorScenarios?: Partial<Record<SupplierErrorKind, HotelErrorScenario>>;
+  readonly errorScenarios?: Partial<Record<SupplierErrorKind, HotelErrorScenarioEntry>>;
 }
 
 /**
@@ -212,8 +234,19 @@ export function describeHotelAdapterContract(
         const retrieved = await adapter.retrieve(ctx, booked.supplierBookingReference);
         assertHotelBookingRecord(retrieved);
         expect(retrieved.supplierBookingReference).toBe(booked.supplierBookingReference);
-        if (retrieved.clientReference !== "") {
-          expect(retrieved.clientReference).toBe(booked.clientReference);
+        // The adapter DECLARES whether retrieve echoes the clientReference
+        // (review #74 L2) — the harness holds it to the declaration instead
+        // of quietly accepting whichever value arrived.
+        if (happyPath.retrieveEchoesClientReference) {
+          expect(
+            retrieved.clientReference,
+            "adapter declares retrieve echoes the clientReference",
+          ).toBe(booked.clientReference);
+        } else {
+          expect(
+            retrieved.clientReference,
+            "adapter declares retrieve does NOT echo the clientReference — a non-empty value contradicts the declared capability",
+          ).toBe("");
         }
       });
 
@@ -234,13 +267,22 @@ export function describeHotelAdapterContract(
 
     describe("error taxonomy: every kind maps from real supplier failures", () => {
       for (const kind of SUPPLIER_ERROR_KINDS) {
-        const scenario = options.errorScenarios?.[kind];
-        if (scenario === undefined || makeContext === undefined) {
+        const entry = options.errorScenarios?.[kind];
+        if (entry === undefined || makeContext === undefined) {
           it.todo(`record this scenario first: ${kind}`);
           continue;
         }
+        if (!("run" in entry)) {
+          // Declared evidence: cited, not driven, in this mode. Registered
+          // skipped so nothing pretends to have executed; certification
+          // reporting renders it as EVIDENCE with the basis verbatim.
+          it.skip(`evidence: ${kind} — ${entry.evidenceBasis}`, () => {
+            /* intentionally empty: the cited evidence lives elsewhere */
+          });
+          continue;
+        }
         it(`rejects with SupplierError(${kind})`, async () => {
-          await expectSupplierErrorKind(() => scenario.run(adapter, makeContext()), kind);
+          await expectSupplierErrorKind(() => entry.run(adapter, makeContext()), kind);
         });
       }
     });

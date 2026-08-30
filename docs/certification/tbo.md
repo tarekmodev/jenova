@@ -4,8 +4,8 @@
 
 - Environment: sandbox
 - Mode: recorded
-- Ran at: 2026-08-30T16:35:35.595Z
-- Checks: 12 (11 passed, 0 failed, 0 skipped, 1 todo)
+- Ran at: 2026-08-30T22:28:00.935Z
+- Checks: 12 (11 passed, 1 evidence-backed, 0 failed, 0 skipped, 0 todo)
 
 | Check | Status | Detail |
 |-------|--------|--------|
@@ -20,7 +20,7 @@
 | error.supplier_timeout — rejects with SupplierError(supplier_timeout) | PASS |  |
 | error.supplier_rejected — rejects with SupplierError(supplier_rejected) | PASS |  |
 | error.auth_failed — rejects with SupplierError(auth_failed) | PASS |  |
-| error.rate_limited — record this scenario first: rate_limited | TODO |  |
+| error.rate_limited — evidence: rate_limited | EVIDENCE | mechanism-verified: HTTP 429 at the transport seam maps to SupplierError(rate_limited) (errors.test.ts) and the shared client retries 429 with backoff (supplier-sdk transport tests). Deliberate live reproduction would violate look-to-book; neither the sandbox sessions nor TBO's Postman collection document a 429 body shape, so the status code is the whole contract. |
 
 **Verdict: NOT CERTIFIABLE** — recorded run; certification requires a clean live sandbox run.
 
@@ -28,8 +28,8 @@
 
 - Environment: sandbox
 - Mode: live
-- Ran at: 2026-08-30T16:35:54.869Z
-- Checks: 12 (10 passed, 0 failed, 0 skipped, 2 todo)
+- Ran at: 2026-08-30T22:28:23.606Z
+- Checks: 12 (10 passed, 2 evidence-backed, 0 failed, 0 skipped, 0 todo)
 
 | Check | Status | Detail |
 |-------|--------|--------|
@@ -38,12 +38,12 @@
 | lifecycle.book — book confirms and passes the clientReference through | PASS |  |
 | lifecycle.retrieve — retrieve returns the booked record by supplier reference | PASS |  |
 | lifecycle.cancel — cancel transitions the booking to cancelled (or pending for async cancellation) | PASS |  |
-| error.sold_out — record this scenario first: sold_out | TODO |  |
+| error.sold_out — evidence: sold_out | EVIDENCE | TBO 201 'No Available rooms' on PreBook, captured live 2026-08-30 (committed recording; replayed as a PASS in the recorded run above). Live reproduction is unreliable: the sandbox answers 201 or 315 for the same stale BookingCode depending on session state — 3/3 probes on 2026-08-31 returned 315. See README.md and docs/certification/tbo-submission.md. |
 | error.price_changed — rejects with SupplierError(price_changed) | PASS |  |
 | error.invalid_request — rejects with SupplierError(invalid_request) | PASS |  |
 | error.supplier_timeout — rejects with SupplierError(supplier_timeout) | PASS |  |
 | error.supplier_rejected — rejects with SupplierError(supplier_rejected) | PASS |  |
 | error.auth_failed — rejects with SupplierError(auth_failed) | PASS |  |
-| error.rate_limited — record this scenario first: rate_limited | TODO |  |
+| error.rate_limited — evidence: rate_limited | EVIDENCE | mechanism-verified: HTTP 429 at the transport seam maps to SupplierError(rate_limited) (errors.test.ts) and the shared client retries 429 with backoff (supplier-sdk transport tests). Deliberate live reproduction would violate look-to-book; neither the sandbox sessions nor TBO's Postman collection document a 429 body shape, so the status code is the whole contract. |
 
-**Verdict: NOT CERTIFIABLE** — 0 failed, 0 skipped, 2 todo.
+**Verdict: CERTIFIABLE** — 10 checks passed against the live sandbox; 2 certified on standing evidence declared by the adapter (basis in the Detail column).

@@ -33,6 +33,14 @@ search → check (revalidate price/availability) → book → retrieve → cance
 - Every adapter ships: contract-test suite passing against recorded sandbox traffic
   (see 09-testing), a certification checklist + automated run report, and a health
   probe used by Platform Admin supplier boards.
+- **Certification honesty rule:** a contract scenario the live run cannot drive
+  deterministically (a nondeterministic sandbox failure mode) or must not drive
+  deliberately (e.g. forcing 429s against a look-to-book obligation) is DECLARED by the
+  adapter as evidence-backed — citing committed real recordings or a transport-layer
+  mechanism test — and the run report renders it as EVIDENCE with the basis, never as a
+  pass. A live run is CERTIFIABLE only when every check passed or carries declared
+  evidence; capability differences (e.g. whether retrieve echoes the client reference)
+  are likewise declared by the adapter, never inferred from response values.
 
 ## Hotel content mapping
 

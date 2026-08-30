@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import type { Transport } from "@jenova/supplier-sdk";
 import { expectSupplierErrorKind } from "@jenova/supplier-sdk/testing";
 import { createTboHotelAdapter } from "./adapter";
 import {
@@ -71,9 +72,26 @@ describe("TBO error taxonomy from recorded sandbox failures", () => {
     expect(offers).toEqual([]);
   });
 
-  // rate_limited: not reachable deliberately — driving the sandbox into 429
-  // would mean hammering it, and look-to-book is a commercial obligation
-  // (CLAUDE.md rule 5). The mapping (HTTP 429 / Status 429 → rate_limited)
-  // is in place; the contract suite carries the scenario as a todo until a
-  // real 429 is ever captured.
+  it("rate_limited: an HTTP 429 surfacing from the transport maps to rate_limited", async () => {
+    // Mechanism verification, not a recording: deliberately driving the
+    // sandbox into a real 429 would mean hammering it, and look-to-book is
+    // a commercial obligation. The rule-5 line holds because nothing
+    // supplier-shaped is fabricated here — an HTTP status code is transport
+    // structure (RFC 6585) handled by the shared supplier-sdk client (which
+    // retries 429 with backoff before surfacing it), the body is empty, and
+    // neither the recorded sandbox sessions nor TBO's Postman collection
+    // document any 429 body shape: the status code is the whole contract
+    // the adapter maps (supplierErrorFromHttp).
+    const throttledSeam: Transport = {
+      send: () => Promise.resolve({ status: 429, headers: {}, body: "" }),
+    };
+    await expectSupplierErrorKind(
+      () =>
+        createTboHotelAdapter({ transport: throttledSeam }).search(
+          makeTestContext(),
+          RECORDED_SEARCH_QUERY,
+        ),
+      "rate_limited",
+    );
+  });
 });

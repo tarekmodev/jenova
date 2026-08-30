@@ -7,13 +7,24 @@
 
 import type { SupplierEnvironment } from "../contracts";
 
-export const CERTIFICATION_CHECK_STATUSES = ["passed", "failed", "skipped", "todo"] as const;
+export const CERTIFICATION_CHECK_STATUSES = [
+  "passed",
+  "evidence",
+  "failed",
+  "skipped",
+  "todo",
+] as const;
 export type CertificationCheckStatus = (typeof CERTIFICATION_CHECK_STATUSES)[number];
 
 export interface CertificationCheck {
   /** Stable id, e.g. "lifecycle.search" or "error.sold_out". */
   readonly id: string;
   readonly title: string;
+  /**
+   * "evidence" = not driven in this run, certified on standing evidence the
+   * adapter declares (committed real recordings or a transport-layer
+   * mechanism test); `detail` carries the declared basis verbatim.
+   */
   readonly status: CertificationCheckStatus;
   readonly detail?: string;
 }
@@ -29,6 +40,7 @@ export interface CertificationRunInfo {
 
 const STATUS_LABELS: Readonly<Record<CertificationCheckStatus, string>> = {
   passed: "PASS",
+  evidence: "EVIDENCE",
   failed: "FAIL",
   skipped: "SKIP",
   todo: "TODO",
@@ -39,9 +51,11 @@ function escapeCell(text: string): string {
 }
 
 /**
- * Suite results → markdown. Verdict: CERTIFIABLE only when every check
- * passed on a LIVE run — recorded runs and any failed/todo/skipped check
- * report NOT CERTIFIABLE with the reason.
+ * Suite results → markdown. Verdict: CERTIFIABLE only on a LIVE run where
+ * every check either passed or is declared evidence-backed — recorded runs
+ * and any failed/todo/skipped check report NOT CERTIFIABLE with the reason.
+ * Evidence-backed checks are called out in the verdict so the basis is
+ * never mistaken for a live pass.
  */
 export function formatCertificationReport(
   run: CertificationRunInfo,
@@ -49,6 +63,7 @@ export function formatCertificationReport(
 ): string {
   const counts: Record<CertificationCheckStatus, number> = {
     passed: 0,
+    evidence: 0,
     failed: 0,
     skipped: 0,
     todo: 0,
@@ -63,7 +78,7 @@ export function formatCertificationReport(
     `- Environment: ${run.environment}`,
     `- Mode: ${run.mode}`,
     `- Ran at: ${run.ranAtUtc}`,
-    `- Checks: ${checks.length} (${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped, ${counts.todo} todo)`,
+    `- Checks: ${checks.length} (${counts.passed} passed, ${counts.evidence} evidence-backed, ${counts.failed} failed, ${counts.skipped} skipped, ${counts.todo} todo)`,
     "",
     "| Check | Status | Detail |",
     "|-------|--------|--------|",
@@ -77,7 +92,11 @@ export function formatCertificationReport(
 
   const incomplete = counts.failed + counts.skipped + counts.todo;
   if (incomplete === 0 && checks.length > 0 && run.mode === "live") {
-    lines.push("**Verdict: CERTIFIABLE** — all checks passed against the live sandbox.");
+    lines.push(
+      counts.evidence === 0
+        ? "**Verdict: CERTIFIABLE** — all checks passed against the live sandbox."
+        : `**Verdict: CERTIFIABLE** — ${counts.passed} checks passed against the live sandbox; ${counts.evidence} certified on standing evidence declared by the adapter (basis in the Detail column).`,
+    );
   } else if (run.mode === "recorded") {
     lines.push(
       "**Verdict: NOT CERTIFIABLE** — recorded run; certification requires a clean live sandbox run.",
