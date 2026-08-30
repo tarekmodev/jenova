@@ -66,6 +66,15 @@ export {
 } from "./resolver";
 
 export {
+  runFanout,
+  type DatabaseFanoutStatus,
+  type FanoutMode,
+  type FanoutOptions,
+  type FanoutReport,
+  type TenantFanoutStatus,
+} from "./fanout";
+
+export {
   TenantNotFoundError,
   TenantNotProvisionedError,
   TenantAlreadyProvisionedError,
