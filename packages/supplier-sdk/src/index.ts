@@ -41,3 +41,25 @@ export {
   type SupplierHttpClientOptions,
   createSupplierHttpClient,
 } from "./transport";
+
+export {
+  type JsonCodecOptions,
+  formatZodIssues,
+  serializeJson,
+  parseJsonWith,
+} from "./codecs/json";
+
+export {
+  type XmlCodecOptions,
+  buildXml,
+  parseXmlWith,
+  type SoapVersion,
+  SOAP_ENVELOPE_NS,
+  type SoapEnvelopeInput,
+  buildSoapEnvelope,
+  type SoapFault,
+  extractSoapFault,
+  defaultSoapFaultKind,
+  type ParseSoapOptions,
+  parseSoapEnvelope,
+} from "./codecs/xml";
