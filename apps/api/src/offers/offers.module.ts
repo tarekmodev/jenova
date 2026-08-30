@@ -78,6 +78,16 @@ import {
       ) => new OfferCheckService(offersService, pricing, registry, credentials),
     },
   ],
-  exports: [OFFERS_SERVICE, OFFER_CHECK_SERVICE, OFFER_STORE, OFFER_TTL_SOURCE],
+  // SUPPLIER_REGISTRY / SUPPLIER_CREDENTIALS_SOURCE are exported so every
+  // engine module shares the ONE process-wide instance (per-account circuit
+  // breakers, vocabulary-drift counters) — the binding itself stays here.
+  exports: [
+    OFFERS_SERVICE,
+    OFFER_CHECK_SERVICE,
+    OFFER_STORE,
+    OFFER_TTL_SOURCE,
+    SUPPLIER_REGISTRY,
+    SUPPLIER_CREDENTIALS_SOURCE,
+  ],
 })
 export class OffersModule {}

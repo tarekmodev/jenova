@@ -11,6 +11,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "./config/config.module";
 import { GatewayModule } from "./gateway/gateway.module";
+import { HotelSearchModule } from "./hotel-search/hotel-search.module";
 import { OffersModule } from "./offers/offers.module";
 import { PricingModule } from "./pricing/pricing.module";
 import { HealthController } from "./health/health.controller";
@@ -21,7 +22,7 @@ import { HTTP_SERVER_HOOKS, noopHttpServerHooks } from "./observability/instrume
   // ConfigModule fails fast (ApiConfigError) before the app can listen.
   // OffersModule provides SUPPLIER_REGISTRY (the TBO adapter binds there —
   // the supplier-registry dir stays the only adapter import point).
-  imports: [ConfigModule, GatewayModule, PricingModule, OffersModule],
+  imports: [ConfigModule, GatewayModule, PricingModule, OffersModule, HotelSearchModule],
   controllers: [HealthController],
   providers: [
     {
