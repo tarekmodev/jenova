@@ -15,6 +15,15 @@ describe("worker config", () => {
     expect(config.pendingSweepIntervalMs).toBe(30_000);
   });
 
+  it("FAIL-CLOSED: unset NODE_ENV resolves to production, never development", () => {
+    const withoutNodeEnv = {
+      REDIS_URL: VALID.REDIS_URL,
+      CONTROL_PLANE_DATABASE_URL: VALID.CONTROL_PLANE_DATABASE_URL,
+      JENOVA_TENANT_RUNTIME_DSN: VALID.JENOVA_TENANT_RUNTIME_DSN,
+    };
+    expect(loadWorkerConfig(withoutNodeEnv).nodeEnv).toBe("production");
+  });
+
   it("honors an explicit sweep interval", () => {
     const config = loadWorkerConfig({ ...VALID, WORKER_PENDING_SWEEP_INTERVAL_MS: "5000" });
     expect(config.pendingSweepIntervalMs).toBe(5_000);

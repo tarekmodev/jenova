@@ -5,12 +5,16 @@
  */
 
 import { z } from "zod";
+import { NODE_ENVS, type NodeEnv } from "@jenova/supplier-registry";
 
-export const NODE_ENVS = ["development", "test", "production"] as const;
-export type NodeEnv = (typeof NODE_ENVS)[number];
+// Single-source NodeEnv vocabulary (supplier-registry gates transport mode
+// AND the credentials seam on it); re-exported for existing importers.
+export { NODE_ENVS, type NodeEnv };
 
 const workerEnvSchema = z.object({
-  NODE_ENV: z.enum(NODE_ENVS).default("development"),
+  // FAIL-CLOSED (review round 2): unset NODE_ENV is PRODUCTION — live
+  // transport, Unbound credentials; development must be asked for by name.
+  NODE_ENV: z.enum(NODE_ENVS).default("production"),
   REDIS_URL: z.url(),
   CONTROL_PLANE_DATABASE_URL: z.url(),
   JENOVA_TENANT_RUNTIME_DSN: z.url(),

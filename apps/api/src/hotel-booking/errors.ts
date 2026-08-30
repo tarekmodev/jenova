@@ -22,8 +22,13 @@ export const BOOKING_ERROR_KINDS = [
   "booking_not_cancellable",
   /** Request payload does not match the offer (rooms/guests mismatch, bad refs). */
   "booking_request_invalid",
-  /** The booking failed at the supplier after reserve — see state=failed. */
-  "booking_failed",
+  /**
+   * Idempotency-key reuse with DIFFERENT parameters: the clientReference
+   * already booked a different offer. Never answered with the original
+   * booking — a partner bug reusing keys must hear a refusal, not a 201
+   * for a hotel it did not ask for (Stripe-style idempotency contract).
+   */
+  "client_reference_conflict",
 ] as const;
 export type BookingErrorKind = (typeof BOOKING_ERROR_KINDS)[number];
 
@@ -41,7 +46,7 @@ const BOOKING_ERROR_STATUS: Readonly<Record<BookingErrorKind, HttpStatus>> = {
   booking_not_found: HttpStatus.NOT_FOUND,
   booking_not_cancellable: HttpStatus.CONFLICT,
   booking_request_invalid: HttpStatus.BAD_REQUEST,
-  booking_failed: HttpStatus.BAD_GATEWAY,
+  client_reference_conflict: HttpStatus.CONFLICT,
 };
 
 /** Maps every booking-path failure onto the standard error envelope. */

@@ -218,9 +218,11 @@ describe.skipIf(!available)("HotelBookingService — book/cancel over recorded T
 
   let bookingId = "";
   let bookingItemId = "";
+  let bookedOfferToken = "";
 
   it("books through the offer gate: quoted → reserved → confirmed, postings balanced", async () => {
     const { offerToken } = await issueCheckedOffer();
+    bookedOfferToken = offerToken;
     const db = await resolver.getTenantDb(tenant);
 
     const result = await service.bookHotel(tenant, {
@@ -279,13 +281,13 @@ describe.skipIf(!available)("HotelBookingService — book/cancel over recorded T
     expect(offerRow?.invalidatedAt).not.toBeNull();
   });
 
-  it("idempotent double-book: the SAME clientReference replays the original booking", async () => {
+  it("idempotent double-book: the SAME clientReference + SAME offer replays the original booking", async () => {
     const before = await (await resolver.getTenantDb(tenant))
       .select({ n: count() })
       .from(bookings);
 
     const replay = await service.bookHotel(tenant, {
-      offerToken: "of1.00000000-0000-0000-0000-000000000000.irrelevant",
+      offerToken: bookedOfferToken, // the ORIGINAL token — equivalence holds
       clientReference: RECORDED_CLIENT_REFERENCE,
       holder: RECORDED_HOLDER,
       rooms: RECORDED_ROOMS,
@@ -300,6 +302,26 @@ describe.skipIf(!available)("HotelBookingService — book/cancel over recorded T
 
     const after = await (await resolver.getTenantDb(tenant)).select({ n: count() }).from(bookings);
     expect(after).toEqual(before); // no second booking row, no supplier call
+  });
+
+  it("clientReference reuse with a DIFFERENT offer is REFUSED — never the wrong booking", async () => {
+    // Review round 2, #1 (Stripe-style idempotency contract): key reuse with
+    // different parameters must refuse, or a partner bug reusing keys hears
+    // "201 confirmed" for a hotel it never asked for.
+    const { offerToken: differentOffer } = await issueCheckedOffer();
+    for (const token of [differentOffer, "of1.00000000-0000-0000-0000-000000000000.garbage"]) {
+      await expect(
+        service.bookHotel(tenant, {
+          offerToken: token,
+          clientReference: RECORDED_CLIENT_REFERENCE,
+          holder: RECORDED_HOLDER,
+          rooms: RECORDED_ROOMS,
+          channel: "b2b",
+          subTenantId: null,
+          actor: ACTOR,
+        }),
+      ).rejects.toMatchObject({ kind: "client_reference_conflict" });
+    }
   });
 
   it("one offer admits exactly ONE booking attempt — the racing claim loses cleanly", async () => {

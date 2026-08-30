@@ -308,6 +308,13 @@ export class BookingTransitionRunner {
           ...(to === "pending_confirmation"
             ? { pollAttempts: 0 }
             : { nextPollAt: patch.nextPollAt ?? null }),
+          // ANY transition that arms a wait (patch.nextPollAt set — e.g.
+          // confirming a pending item whose cancellation is still pending)
+          // is a NEW wait: reset backoff PER WAIT, not per state name
+          // (review round 2, L1).
+          ...(patch.nextPollAt !== undefined && patch.nextPollAt !== null
+            ? { pollAttempts: 0 }
+            : {}),
         })
         .where(and(eq(bookingItems.id, bookingItemId), eq(bookingItems.state, from)))
         .returning({ id: bookingItems.id });

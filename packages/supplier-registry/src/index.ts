@@ -28,9 +28,30 @@ import type { TenantId } from "@jenova/domain";
 /** Nest injection token for the process-wide {@link SupplierRegistry}. */
 export const SUPPLIER_REGISTRY = Symbol("jenova.api.supplierRegistry");
 
-/** Mirrors the api/worker config NodeEnv values (docs/09-testing.md). */
-const NODE_ENVS = ["development", "test", "production"] as const;
-type NodeEnv = (typeof NODE_ENVS)[number];
+/**
+ * THE NodeEnv vocabulary for every engine process (api + worker configs
+ * import it from here — single source, because this package's transport
+ * mode AND the credentials seam key off it; review round 2, L3/#4).
+ */
+export const NODE_ENVS = ["development", "test", "production"] as const;
+export type NodeEnv = (typeof NODE_ENVS)[number];
+
+export function isNodeEnv(value: string): value is NodeEnv {
+  return (NODE_ENVS as readonly string[]).includes(value);
+}
+
+/**
+ * FAIL-CLOSED resolution: an unset, empty, or typo'd NODE_ENV is treated
+ * as PRODUCTION — live transport, no recording, no env credentials.
+ * Development conveniences must be asked for by name; a deployment that
+ * forgets NODE_ENV gets the strict posture, never the dev seams.
+ */
+export function resolveNodeEnv(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): NodeEnv {
+  const value = env["NODE_ENV"] ?? "";
+  return isNodeEnv(value) ? value : "production";
+}
 
 export type SupplierTransportMode = "live" | "record" | "replay";
 
@@ -43,13 +64,6 @@ export function transportModeForEnv(nodeEnv: NodeEnv): SupplierTransportMode {
     case "test":
       return "replay";
   }
-}
-
-function nodeEnvFromProcess(): NodeEnv {
-  const value = process.env["NODE_ENV"];
-  return (NODE_ENVS as readonly string[]).includes(value ?? "")
-    ? (value as NodeEnv)
-    : "development";
 }
 
 export interface SupplierRegistry {
@@ -107,7 +121,7 @@ export interface SupplierRegistryOptions {
  * vocabulary-drift log so the health board can attribute counts.
  */
 export function createSupplierRegistry(options: SupplierRegistryOptions = {}): SupplierRegistry {
-  const mode = options.mode ?? transportModeForEnv(nodeEnvFromProcess());
+  const mode = options.mode ?? transportModeForEnv(resolveNodeEnv());
   const tboDrift = createSkippedRoomRateLog();
   return new StaticSupplierRegistry(
     [
@@ -162,12 +176,15 @@ export class EnvSupplierCredentialsSource implements SupplierCredentialsSource {
   constructor(private readonly env: Readonly<Record<string, string | undefined>> = process.env) {}
 
   credentialsFor(tenant: TenantId, supplierCode: string): Promise<SupplierAccountCredentials> {
-    if (this.env["NODE_ENV"] === "production") {
+    if (this.env["NODE_ENV"] !== "development") {
       // Belt AND braces with the wiring (which binds Unbound outside
-      // development): env credentials must be structurally unusable in
-      // production even if mis-wired (review M1).
+      // development): env credentials work ONLY under an EXPLICIT
+      // NODE_ENV=development — unset or typo'd fails closed (review
+      // round 2, L3).
       return Promise.reject(
-        new Error("EnvSupplierCredentialsSource is a development-only seam — refused in production"),
+        new Error(
+          "EnvSupplierCredentialsSource is a development-only seam — it requires an explicit NODE_ENV=development",
+        ),
       );
     }
     if (supplierCode !== TBO_SUPPLIER_CODE) {

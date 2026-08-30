@@ -19,7 +19,7 @@
  * via escalated_at / escalation_reason + the booking_item.escalated event).
  */
 
-import { and, asc, eq, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import type { Money, TenantId } from "@jenova/domain";
 import { resolvePenaltyAt, SupplierError, zero } from "@jenova/domain";
 import { bookingItems, type TenantDbResolver } from "@jenova/db";
@@ -90,7 +90,7 @@ export interface PollReport {
 const WORKER_ACTOR: AuditActor = { actorType: "system", actorId: "worker:pending-confirmation" };
 
 function waitKindOf(item: BookingItemRow): PendingWaitKind {
-  if (item.state === "reserved") return "reservation";
+  if (item.state === "quoted" || item.state === "reserved") return "reservation";
   return item.state === "pending_confirmation" ? "confirmation" : "cancellation";
 }
 
@@ -118,10 +118,11 @@ export class PendingConfirmationPoller {
 
   /**
    * Items whose wait is due for a poll (never escalated ones), plus
-   * RESERVED items older than the max pending age: an item stranded in
-   * `reserved` (crash between reserve and the supplier's book answer)
+   * QUOTED/RESERVED items older than the max pending age: an item stranded
+   * pre-book (crash between create and reserve — offer claimed, client
+   * reference burned — or between reserve and the supplier's book answer)
    * must surface in the manual queue, not sit invisible forever
-   * (review M1).
+   * (review M1/M2).
    */
   async duePendingItems(tenant: TenantId, limit = 50): Promise<readonly BookingItemRow[]> {
     const db = await this.resolver.getTenantDb(tenant);
@@ -144,7 +145,7 @@ export class PendingConfirmationPoller {
               or(isNull(bookingItems.nextPollAt), lte(bookingItems.nextPollAt, now)),
             ),
             and(
-              eq(bookingItems.state, "reserved"),
+              inArray(bookingItems.state, ["quoted", "reserved"]),
               lte(bookingItems.updatedAt, reservedStuckBefore),
             ),
           ),
@@ -184,17 +185,23 @@ export class PendingConfirmationPoller {
   async pollItem(tenant: TenantId, item: BookingItemRow): Promise<PendingItemOutcome> {
     const kind = waitKindOf(item);
     if (kind === "reservation") {
-      // Stranded reserve: the book outcome is unknown (no supplier ref, or
-      // the process died before recording it) — never guess with money on
-      // the line; hand it to a human with the client reference to check.
-      await this.runner.escalate(
-        tenant,
-        item.id,
-        WORKER_ACTOR,
-        "item stuck in reserved past the max pending age — verify with the supplier " +
-          "whether a reservation exists for this booking's clientReference, then fail or confirm it manually",
-      );
-      return { bookingItemId: item.id, kind, outcome: "escalated", detail: "reserved past max age" };
+      // Stranded pre-book item — never guess with money on the line; hand
+      // it to a human. quoted = crash before reserve: the offer is claimed
+      // and the clientReference burned but NO supplier call was made.
+      // reserved = crash around book(): the supplier MAY hold a reservation.
+      const reason =
+        item.state === "quoted"
+          ? "item stuck in quoted past the max pending age — no supplier call was made; " +
+            "fail it manually and release the buyer's clientReference"
+          : "item stuck in reserved past the max pending age — verify with the supplier " +
+            "whether a reservation exists for this booking's clientReference, then fail or confirm it manually";
+      await this.runner.escalate(tenant, item.id, WORKER_ACTOR, reason);
+      return {
+        bookingItemId: item.id,
+        kind,
+        outcome: "escalated",
+        detail: `${item.state} past max age`,
+      };
     }
     if (item.supplierReference === null) {
       // Unreachable by construction (only booked items enter these waits) —

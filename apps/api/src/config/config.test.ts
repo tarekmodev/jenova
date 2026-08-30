@@ -11,10 +11,12 @@ const validEnv = {
 };
 
 describe("loadApiConfig", () => {
-  it("parses a minimal valid environment and applies defaults", () => {
+  it("parses a minimal valid environment and applies FAIL-CLOSED defaults", () => {
     const config = loadApiConfig(validEnv);
     expect(config).toEqual({
-      nodeEnv: "development",
+      // Unset NODE_ENV is production (review round 2): live transport,
+      // Unbound credentials — dev seams must be asked for by name.
+      nodeEnv: "production",
       port: 3000,
       controlPlaneDatabaseUrl: validEnv.CONTROL_PLANE_DATABASE_URL,
       redisUrl: validEnv.REDIS_URL,
@@ -26,8 +28,8 @@ describe("loadApiConfig", () => {
   });
 
   it("honors explicit NODE_ENV and API_PORT", () => {
-    const config = loadApiConfig({ ...validEnv, NODE_ENV: "production", API_PORT: "8080" });
-    expect(config.nodeEnv).toBe("production");
+    const config = loadApiConfig({ ...validEnv, NODE_ENV: "development", API_PORT: "8080" });
+    expect(config.nodeEnv).toBe("development");
     expect(config.port).toBe(8080);
   });
 

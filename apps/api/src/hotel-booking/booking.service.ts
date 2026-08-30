@@ -55,6 +55,7 @@ import { eq } from "drizzle-orm";
 import type { SupplierCredentialsSource, SupplierRegistry } from "@jenova/supplier-registry";
 import { OfferError, SupplierUnavailableError } from "../offers/errors";
 import type { OffersService, VerifiedOffer } from "../offers/offers.service";
+import { parseOfferToken } from "../offers/signing";
 import { BookingError } from "./errors";
 
 export const HOTEL_BOOKING_SERVICE = Symbol("jenova.api.hotelBookingService");
@@ -184,6 +185,9 @@ export class HotelBookingService {
       if (created.booking.agencyId !== input.subTenantId) {
         throw new BookingError("booking_request_invalid", "clientReference is already in use");
       }
+      // Same equivalence rule (review M1-2): a replay must be a replay of
+      // the SAME request, or it is refused.
+      this.assertReplayEquivalence(created.item, input.offerToken);
       // Return the ORIGINAL state — never re-drive the supplier from a
       // replayed call.
       return this.toBookResult(created.booking, created.item, true);
@@ -602,7 +606,27 @@ export class HotelBookingService {
     if (item === undefined) {
       throw new BookingError("booking_not_found", "unknown booking");
     }
+    this.assertReplayEquivalence(item, input.offerToken);
     return this.toBookResult(booking, item, true);
+  }
+
+  /**
+   * Idempotency-key EQUIVALENCE (review M1-2): a clientReference hit only
+   * replays when the presented offer token addresses the SAME offer the
+   * original booking consumed. A reused key with a different (or garbage)
+   * token is a partner bug — refuse it loudly; answering with the original
+   * booking would tell the caller a different hotel was booked. No signature
+   * verification here on purpose: the stored offerId is ours, and the
+   * original call already verified the token it booked with.
+   */
+  private assertReplayEquivalence(item: BookingItemRow, offerToken: string): void {
+    const parsed = parseOfferToken(offerToken);
+    if (parsed === null || item.offerId === null || parsed.offerId !== item.offerId) {
+      throw new BookingError(
+        "client_reference_conflict",
+        "this clientReference was already used with a different offer — retry with the original offer token or use a fresh clientReference",
+      );
+    }
   }
 
   private async loadScoped(
