@@ -22,6 +22,7 @@ import { SESSION_SERVICE, type SessionService } from "../src/auth/session-servic
 import { API_CONFIG, type ApiConfig } from "../src/config/config";
 import { REQUEST_ID_HEADER } from "../src/gateway/request-context.middleware";
 import { TENANT_DIRECTORY, type TenantDirectory } from "../src/gateway/tenant-directory";
+import { InMemorySearchCache, SEARCH_CACHE } from "../src/hotel-search/cache";
 import { InMemorySupplierAccountsSource, SUPPLIER_ACCOUNTS_SOURCE } from "../src/hotel-search/supplier-accounts";
 import { InMemoryOfferStore, OFFER_STORE } from "../src/offers/offer-store";
 import { OFFERS_SERVICE, type OffersService } from "../src/offers/offers.service";
@@ -155,6 +156,9 @@ describe("hotel search SSE e2e (replay-backed)", () => {
       // so the in-memory port implementation stands in.
       .overrideProvider(OFFER_STORE)
       .useValue(new InMemoryOfferStore())
+      // Hermetic cache backend — no Redis dependency in CI.
+      .overrideProvider(SEARCH_CACHE)
+      .useValue(new InMemorySearchCache())
       // Adapter transport pinned to replay — recordings only, no network.
       .overrideProvider(SUPPLIER_REGISTRY)
       .useValue(createSupplierRegistry({ mode: "replay" }))

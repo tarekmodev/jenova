@@ -18,6 +18,8 @@ import { InMemoryOfferStore } from "../offers/offer-store";
 import { FixedOfferTtlSource, OffersService } from "../offers/offers.service";
 import { InMemoryMarkupRuleSource, PricingService } from "../pricing/pricing.service";
 import { StaticSupplierRegistry, type SupplierCredentialsSource } from "../supplier-registry";
+import { AvailabilityCache, FixedSearchCacheTtlSource } from "./availability-cache";
+import { InMemorySearchCache } from "./cache";
 import { HotelSearchService, type HotelSearchEvent, type HotelSearchRequest } from "./search.service";
 import { InMemorySupplierAccountsSource } from "./supplier-accounts";
 
@@ -112,7 +114,11 @@ interface Harness {
 
 function harness(
   adapters: readonly HotelSupplierAdapter[],
-  options: { budgetMs?: number; enabled?: readonly string[] } = {},
+  options: {
+    budgetMs?: number;
+    enabled?: readonly string[];
+    availabilityCache?: AvailabilityCache;
+  } = {},
 ): Harness {
   const registry = new StaticSupplierRegistry(adapters);
   const accounts = new InMemorySupplierAccountsSource();
@@ -125,7 +131,12 @@ function harness(
     credentials,
     new PricingService(rules),
     offersService,
-    { budgetMs: options.budgetMs ?? 2_000 },
+    {
+      budgetMs: options.budgetMs ?? 2_000,
+      ...(options.availabilityCache === undefined
+        ? {}
+        : { availabilityCache: options.availabilityCache }),
+    },
   );
   return {
     service,
@@ -337,5 +348,93 @@ describe("pricing + signed-offer issuance (rules 6/8)", () => {
       h.collect(makeRequest({ query: { ...QUERY, checkOut: "2026-10-13" } })),
     ).rejects.toThrow(/checkOut/);
     expect(a.searchCalls).toBe(0);
+  });
+});
+
+describe("availability cache integration (issue #61)", () => {
+  function cachedHarness(adapter: HotelSupplierAdapter) {
+    const availabilityCache = new AvailabilityCache(
+      new InMemorySearchCache(),
+      new FixedSearchCacheTtlSource(90),
+    );
+    return harness([adapter], { availabilityCache });
+  }
+
+  it("a repeated search hits the cache but STILL issues fresh re-priced offers", async () => {
+    const a = new SearchAdapterDouble("sup-a", resolveAfter(1, [laneOffer(50_000)]));
+    const h = cachedHarness(a);
+
+    const first = await h.collect();
+    expect(a.searchCalls).toBe(1);
+    const firstResults = eventsOfType(first, "supplier.results")[0];
+    expect(firstResults?.fromCache).toBe(false);
+    const firstOffer = firstResults?.offers[0];
+
+    // Markup rules change between the two searches: the cached availability
+    // must be re-priced, never served at the old price.
+    h.rules.setRules(TENANT, [
+      {
+        id: "rule-20pct",
+        priority: 0,
+        agencyId: null,
+        channel: null,
+        vertical: null,
+        supplierCode: null,
+        destination: null,
+        travelFrom: null,
+        travelTo: null,
+        valueType: "percent",
+        value: 2_000n,
+        currency: null,
+        commissionSplitBps: null,
+        active: true,
+      },
+    ]);
+
+    const second = await h.collect();
+    expect(a.searchCalls).toBe(1); // supplier round-trip saved
+    const secondResults = eventsOfType(second, "supplier.results")[0];
+    expect(secondResults?.fromCache).toBe(true);
+    const secondOffer = secondResults?.offers[0];
+    expect(secondOffer).toBeDefined();
+    if (firstOffer === undefined || secondOffer === undefined) throw new Error("missing offers");
+
+    // Fresh signed offer (new id/token), freshly priced (+20% now).
+    expect(secondOffer.offerId).not.toBe(firstOffer.offerId);
+    expect(secondOffer.offerToken).not.toBe(firstOffer.offerToken);
+    expect(firstOffer.sell).toEqual(money(50_000, "SAR"));
+    expect(secondOffer.sell).toEqual(money(60_000, "SAR"));
+    await expect(
+      h.offersService.verifyOfferToken(TENANT, secondOffer.offerToken, { subTenantId: null }),
+    ).resolves.toMatchObject({ nationality: "SA" });
+  });
+
+  it("a different nationality never reads another nationality's entry (rule 9)", async () => {
+    const a = new SearchAdapterDouble("sup-a", (ctx) =>
+      Promise.resolve([laneOffer(50_000, "prop-1", ctx.nationality)]),
+    );
+    const h = cachedHarness(a);
+    await h.collect(makeRequest({ nationality: "SA" }));
+    await h.collect(makeRequest({ nationality: "AE" }));
+    expect(a.searchCalls).toBe(2);
+    // Same nationality again: cached.
+    await h.collect(makeRequest({ nationality: "AE" }));
+    expect(a.searchCalls).toBe(2);
+  });
+
+  it("a failing lane caches nothing — the next search asks the supplier again", async () => {
+    let calls = 0;
+    const flaky = new SearchAdapterDouble("sup-a", () => {
+      calls += 1;
+      return calls === 1
+        ? Promise.reject(new SupplierError("supplier_timeout", "slow"))
+        : Promise.resolve([laneOffer(50_000)]);
+    });
+    const h = cachedHarness(flaky);
+    const first = await h.collect();
+    expect(eventsOfType(first, "supplier.failed")[0]?.kind).toBe("supplier_timeout");
+    const second = await h.collect();
+    expect(eventsOfType(second, "supplier.results")[0]?.offers).toHaveLength(1);
+    expect(calls).toBe(2);
   });
 });

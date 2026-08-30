@@ -41,6 +41,7 @@ import type { PricingService } from "../pricing/pricing.service";
 import type { PricingContext } from "../pricing/rules";
 import type { OffersService } from "../offers/offers.service";
 import type { SupplierCredentialsSource, SupplierRegistry } from "../supplier-registry";
+import type { AvailabilityCache } from "./availability-cache";
 import type { SupplierAccountsSource } from "./supplier-accounts";
 
 /** Nest injection token for the process-wide {@link HotelSearchService}. */
@@ -98,6 +99,12 @@ export type HotelSearchEvent =
       readonly type: "supplier.results";
       readonly searchId: string;
       readonly supplierCode: string;
+      /**
+       * True when availability came from the short-TTL cache. The offers
+       * are STILL freshly priced and freshly signed — only the supplier
+       * round-trip was saved (see availability-cache.ts).
+       */
+      readonly fromCache: boolean;
       readonly offers: readonly HotelOfferSummary[];
     }
   | {
@@ -120,6 +127,12 @@ export type HotelSearchEvent =
 export interface HotelSearchServiceOptions {
   /** Hard total budget in ms; clamped to [MIN, MAX]. Default 8000. */
   readonly budgetMs?: number;
+  /**
+   * Short-TTL availability cache (issue #61). A hit saves the supplier
+   * round-trip only — cached availability is still re-priced and re-issued
+   * as fresh signed offers on every search. Omitted = no caching.
+   */
+  readonly availabilityCache?: AvailabilityCache;
   /** Clock seam for tests; production uses the real server clock. */
   readonly now?: () => Date;
 }
@@ -171,6 +184,7 @@ type LaneResult = Extract<HotelSearchEvent, { type: "supplier.results" | "suppli
 
 export class HotelSearchService {
   private readonly budgetMs: number;
+  private readonly availability: AvailabilityCache | null;
   private readonly now: () => Date;
 
   constructor(
@@ -185,6 +199,7 @@ export class HotelSearchService {
       MAX_SEARCH_BUDGET_MS,
       Math.max(MIN_SEARCH_BUDGET_MS, Math.trunc(options.budgetMs ?? DEFAULT_SEARCH_BUDGET_MS)),
     );
+    this.availability = options.availabilityCache ?? null;
     this.now = options.now ?? (() => new Date());
   }
 
@@ -290,9 +305,18 @@ export class HotelSearchService {
         // The registry can change between resolution and the lane running.
         return { type: "supplier.failed", searchId, supplierCode, kind: "supplier_unavailable" };
       }
-      const found = await this.callSupplierSearch(tenant, adapter, request, deadline);
+      const lookup = { supplierCode, query: request.query, nationality: request.nationality };
+      // Availability cache (issue #61): a hit saves ONLY the supplier
+      // round-trip; pricing + signed-offer issuance below run on every
+      // search regardless, so prices and offer TTLs are always current.
+      let found = await this.availability?.get(tenant, lookup) ?? null;
+      const fromCache = found !== null;
+      if (found === null) {
+        found = await this.callSupplierSearch(tenant, adapter, request, deadline);
+        await this.availability?.put(tenant, lookup, found);
+      }
       const offers = await this.priceAndIssue(tenant, supplierCode, request, found);
-      return { type: "supplier.results", searchId, supplierCode, offers };
+      return { type: "supplier.results", searchId, supplierCode, fromCache, offers };
     } catch (error) {
       return {
         type: "supplier.failed",

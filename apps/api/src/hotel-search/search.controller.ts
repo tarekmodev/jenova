@@ -112,6 +112,7 @@ function eventFrame(event: HotelSearchEvent): string {
       return frame("supplier.results", {
         searchId: event.searchId,
         supplierCode: event.supplierCode,
+        fromCache: event.fromCache,
         offers: event.offers.map(offerPayload),
       });
     case "supplier.failed":
@@ -213,10 +214,15 @@ export class HotelSearchController {
         },
         "supplier.results": {
           type: "object",
-          required: ["searchId", "supplierCode", "offers"],
+          required: ["searchId", "supplierCode", "fromCache", "offers"],
           properties: {
             searchId: { type: "string", format: "uuid" },
             supplierCode: { type: "string" },
+            fromCache: {
+              type: "boolean",
+              description:
+                "Availability served from the short-TTL cache; offers are still freshly priced and signed.",
+            },
             offers: { type: "array", items: OFFER_SUMMARY_SCHEMA },
           },
         },
