@@ -1,0 +1,57 @@
+# RTL/LTR screenshot sweep for the ui package (issue #88).
+#
+# Runs only when packages/ui changes. Budget-conscious: ONE Storybook
+# build, then one Playwright run that snapshots every story in BOTH
+# directions (ar/rtl + en/ltr) from the static build. Screenshots are
+# uploaded as the review artifact for the bilingual definition of done.
+name: UI screenshots
+
+on:
+  pull_request:
+    paths:
+      - "packages/ui/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/ui-screenshots.yml"
+  push:
+    branches: [main]
+    paths:
+      - "packages/ui/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/ui-screenshots.yml"
+
+concurrency:
+  group: ui-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Storybook (once)
+        run: pnpm --filter @jenova/ui build-storybook
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @jenova/ui exec playwright install --with-deps chromium
+
+      - name: Screenshot every story in both directions
+        run: pnpm --filter @jenova/ui test:screenshots
+
+      - name: Upload screenshots (ar/rtl + en/ltr)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: packages/ui/screenshots/__screenshots__/
+          retention-days: 14

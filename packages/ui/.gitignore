@@ -1,0 +1,6 @@
+# Build + harness outputs (CI uploads screenshots as artifacts)
+storybook-static/
+screenshots/__screenshots__/
+test-results/
+playwright-report/
+*storybook.log
