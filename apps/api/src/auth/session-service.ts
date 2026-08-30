@@ -169,7 +169,12 @@ export class SessionService implements SessionVerifier {
       await this.store.delete(tokenHash);
       return { ok: false, reason: "idle_timeout" };
     }
-    await this.store.put({ ...record, lastSeenAtMs: now });
+    // Conditional touch, never a re-insert: if a revocation landed between
+    // our `get` and here, touch returns false and the revocation WINS — a
+    // blind put would resurrect the revoked record.
+    if (!(await this.store.touch(tokenHash, now))) {
+      return { ok: false, reason: "unknown_token" };
+    }
     return {
       ok: true,
       auth: {
@@ -197,7 +202,12 @@ export class SessionService implements SessionVerifier {
     if (!verified.ok) {
       return verified;
     }
-    await this.store.delete(verified.auth.sessionTokenHash);
+    // The delete must be OURS: false means a concurrent revoke (or the
+    // other of two racing rotations) got there first — minting a
+    // replacement then would hand a fresh session to a dead credential.
+    if (!(await this.store.delete(verified.auth.sessionTokenHash))) {
+      return { ok: false, reason: "unknown_token" };
+    }
     const principal = nextPrincipal ?? (verified.auth.principal as SessionPrincipal<R>);
     return { ok: true, session: await this.issue(principal) };
   }

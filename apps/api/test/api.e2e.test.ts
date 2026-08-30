@@ -7,7 +7,7 @@ import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.factory";
 import { SESSION_SERVICE, type SessionService } from "../src/auth/session-service";
 import { API_CONFIG, type ApiConfig } from "../src/config/config";
-import { RequiresApp, RequiresRealm } from "../src/gateway/decorators";
+import { AllowAnonymous, RequiresApp, RequiresRealm } from "../src/gateway/decorators";
 import { ENTITLEMENT_SOURCE, type EntitlementSource } from "../src/gateway/entitlement-source";
 import { REQUEST_ID_HEADER } from "../src/gateway/request-context.middleware";
 import { TENANT_DIRECTORY, type TenantDirectory } from "../src/gateway/tenant-directory";
@@ -37,17 +37,21 @@ const testEntitlements: EntitlementSource = {
     Promise.resolve(id === KNOWN_TENANT && appKey === "b2b"),
 };
 
-/** Demo surface for exercising @RequiresApp end to end (test-only). */
+/** Demo surface for exercising the gateway gates end to end (test-only). */
 @Controller("demo")
 class DemoController {
+  // @AllowAnonymous isolates the app-entitlement gate under test from the
+  // default-deny realm gate (a public app surface, e.g. storefront search).
   @Get("b2b")
   @RequiresApp("b2b")
+  @AllowAnonymous()
   b2bGated(): { ok: true } {
     return { ok: true };
   }
 
   @Get("crm")
   @RequiresApp("crm")
+  @AllowAnonymous()
   crmGated(): { ok: true } {
     return { ok: true };
   }
@@ -55,6 +59,12 @@ class DemoController {
   @Get("agency-only")
   @RequiresRealm("agency")
   agencyOnly(): { ok: true } {
+    return { ok: true };
+  }
+
+  /** Deliberately UNDECORATED: default-deny must refuse everyone (F2). */
+  @Get("forgotten-decorator")
+  forgottenDecorator(): { ok: true } {
     return { ok: true };
   }
 }
@@ -199,6 +209,24 @@ describe("api e2e", () => {
         .set("Authorization", "Bearer agency.gibberish-credential")
         .expect(401);
       expect(JSON.stringify(res.body)).not.toContain("gibberish-credential");
+    });
+
+    it("DEFAULT-DENY: an undecorated route 401s anonymous callers (F2)", async () => {
+      const res = await request(app.getHttpServer())
+        .get("/demo/forgotten-decorator")
+        .set("Host", KNOWN_HOST)
+        .expect(401);
+      expect(res.body.error.code).toBe("unauthorized");
+    });
+
+    it("DEFAULT-DENY: an undecorated route 401s even a VALID session", async () => {
+      const token = await issueSession("agency");
+      const res = await request(app.getHttpServer())
+        .get("/demo/forgotten-decorator")
+        .set("Host", KNOWN_HOST)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(401);
+      expect(res.body.error.code).toBe("unauthorized");
     });
   });
 });

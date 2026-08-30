@@ -35,8 +35,10 @@ export interface GatewayRequestInfo {
   readonly authorization: string | null;
   /** AppKey from @RequiresApp route metadata; null = route not app-gated. */
   readonly requiredApp: AppKey | null;
-  /** Realms from @RequiresRealm route metadata; null = no realm gate. */
+  /** Realms from @RequiresRealm route metadata; null = none declared. */
   readonly allowedRealms: readonly AuthRealm[] | null;
+  /** @AllowAnonymous route metadata — the deliberate opt-out of default-deny. */
+  readonly allowAnonymous: boolean;
 }
 
 export const GATEWAY_STAGE_ORDER = [
@@ -88,7 +90,10 @@ export class TenantResolutionStage implements GatewayStage {
  * verifier, the machine realm through the HMAC key verifier. Fails closed —
  * a PRESENT Authorization header that does not verify is a 401, never
  * silently anonymous — and every refusal is the same generic 401 (no
- * oracle over why). Finally enforces the route's @RequiresRealm gate.
+ * oracle over why). The realm gate is DEFAULT-DENY: only @RequiresRealm
+ * (matching realm) or an explicit @AllowAnonymous lets a request through;
+ * an undecorated route refuses everyone, so a forgotten decorator ships a
+ * dead route, never an open one.
  */
 export class AuthRealmStage implements GatewayStage {
   readonly name = "auth_realm";
@@ -130,12 +135,20 @@ export class AuthRealmStage implements GatewayStage {
       context.auth = result.auth;
     }
 
-    // Route realm gate: cross-realm use of a perfectly valid session is
-    // still a 401 — realm-bound tokens never cross (docs/08).
-    if (
-      request.allowedRealms !== null &&
-      (context.auth.state !== "verified" || !request.allowedRealms.includes(context.auth.realm))
-    ) {
+    // Route realm gate, default-deny (F2). @RequiresRealm wins over
+    // @AllowAnonymous when both are present.
+    if (request.allowedRealms !== null) {
+      // Cross-realm use of a perfectly valid session is still a 401 —
+      // realm-bound tokens never cross (docs/08).
+      if (
+        context.auth.state !== "verified" ||
+        !request.allowedRealms.includes(context.auth.realm)
+      ) {
+        throw ApiHttpError.unauthorized();
+      }
+    } else if (!request.allowAnonymous) {
+      // Undecorated route: refused for anonymous AND verified callers
+      // alike, with the same indistinguishable 401.
       throw ApiHttpError.unauthorized();
     }
   }

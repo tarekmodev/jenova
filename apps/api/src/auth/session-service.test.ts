@@ -6,7 +6,7 @@ import {
   SessionService,
   type SessionVerification,
 } from "./session-service";
-import { InMemorySessionStore } from "./session-store";
+import { InMemorySessionStore, type SessionRecord, type SessionStore } from "./session-store";
 
 // Structural test identities only — they exercise the session machinery.
 const TENANT_A = tenantId("tenant-a");
@@ -259,5 +259,130 @@ describe("SessionService revocation", () => {
     }
     const alive = credentialOf(theirs.token);
     expect((await service.verifySession("agency", alive.credential, TENANT_A)).ok).toBe(true);
+  });
+});
+
+describe("InMemorySessionStore.touch (atomicity contract)", () => {
+  it("returns false for a missing record and NEVER re-creates it", async () => {
+    const store = new InMemorySessionStore();
+    expect(await store.touch("no-such-hash", 123)).toBe(false);
+    expect(await store.get("no-such-hash")).toBeNull();
+  });
+});
+
+describe("revocation races (F1 — revocation must win every race)", () => {
+  /** Store that lets a test inject a concurrent revoke between two service steps. */
+  class RacingStore implements SessionStore {
+    constructor(
+      private readonly inner: InMemorySessionStore,
+      private readonly hooks: {
+        afterGet?: (tokenHash: string) => Promise<void>;
+        beforeDelete?: (tokenHash: string) => Promise<void>;
+      } = {},
+    ) {}
+
+    readonly issuedHashes: string[] = [];
+
+    async get(tokenHash: string): Promise<SessionRecord | null> {
+      const record = await this.inner.get(tokenHash);
+      // The concurrent revoke lands AFTER verify's read, BEFORE its touch.
+      await this.hooks.afterGet?.(tokenHash);
+      return record;
+    }
+
+    put(record: SessionRecord): Promise<void> {
+      this.issuedHashes.push(record.tokenHash);
+      return this.inner.put(record);
+    }
+
+    touch(tokenHash: string, lastSeenAtMs: number): Promise<boolean> {
+      return this.inner.touch(tokenHash, lastSeenAtMs);
+    }
+
+    async delete(tokenHash: string): Promise<boolean> {
+      // The concurrent revoke lands AFTER rotate's verify, BEFORE its delete.
+      await this.hooks.beforeDelete?.(tokenHash);
+      return this.inner.delete(tokenHash);
+    }
+
+    deleteAllForUser(
+      ...args: Parameters<SessionStore["deleteAllForUser"]>
+    ): Promise<number> {
+      return this.inner.deleteAllForUser(...args);
+    }
+  }
+
+  it("revokeAllForUser racing a verify-touch never resurrects the session", async () => {
+    const inner = new InMemorySessionStore();
+    let raceArmed = false;
+    const store = new RacingStore(inner, {
+      afterGet: async () => {
+        if (raceArmed) {
+          // Admin's "log out everywhere" lands mid-verify.
+          await inner.deleteAllForUser("agency", "user-1", TENANT_A);
+        }
+      },
+    });
+    const service = new SessionService(store);
+    const issued = await service.issue(agencyPrincipal("user-1"));
+    const { credential } = credentialOf(issued.token);
+
+    raceArmed = true;
+    const racedVerify = await service.verifySession("agency", credential, TENANT_A);
+    expect(racedVerify).toEqual({ ok: false, reason: "unknown_token" });
+    // The revoked record was NOT re-inserted by the touch.
+    expect(await inner.get(issued.tokenHash)).toBeNull();
+    raceArmed = false;
+    expect(await service.verifySession("agency", credential, TENANT_A)).toEqual({
+      ok: false,
+      reason: "unknown_token",
+    });
+  });
+
+  it("rotate racing a revoke never mints a replacement session", async () => {
+    const inner = new InMemorySessionStore();
+    let raceArmed = false;
+    const store = new RacingStore(inner, {
+      beforeDelete: async (tokenHash) => {
+        if (raceArmed) {
+          await inner.delete(tokenHash); // The concurrent revoke wins the delete.
+        }
+      },
+    });
+    const service = new SessionService(store);
+    const issued = await service.issue(agencyPrincipal());
+    const { credential } = credentialOf(issued.token);
+
+    raceArmed = true;
+    const rotated = await service.rotate("agency", credential, TENANT_A);
+    expect(rotated).toEqual({ ok: false, reason: "unknown_token" });
+    // Old token dead AND no replacement was ever issued.
+    expect(await service.verifySession("agency", credential, TENANT_A)).toEqual({
+      ok: false,
+      reason: "unknown_token",
+    });
+    expect(store.issuedHashes).toEqual([issued.tokenHash]);
+  });
+
+  it("two concurrent rotations of one token yield exactly ONE winner", async () => {
+    const store = new InMemorySessionStore();
+    const service = new SessionService(store);
+    const issued = await service.issue(agencyPrincipal());
+    const { credential } = credentialOf(issued.token);
+
+    const [first, second] = await Promise.all([
+      service.rotate("agency", credential, TENANT_A),
+      service.rotate("agency", credential, TENANT_A),
+    ]);
+    const winners = [first, second].filter((result) => result.ok);
+    expect(winners).toHaveLength(1);
+
+    // The old credential is dead, and exactly the winner's replacement lives.
+    expect((await service.verifySession("agency", credential, TENANT_A)).ok).toBe(false);
+    const winner = winners[0]!;
+    if (winner.ok) {
+      const next = credentialOf(winner.session.token);
+      expect((await service.verifySession("agency", next.credential, TENANT_A)).ok).toBe(true);
+    }
   });
 });

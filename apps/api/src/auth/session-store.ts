@@ -23,11 +23,27 @@ export interface SessionRecord {
   readonly lastSeenAtMs: number;
 }
 
+/**
+ * ATOMICITY CONTRACT (every implementation, redis included, inherits it):
+ * revocation must win every race. `touch` is a CONDITIONAL update — it
+ * updates iff the record still exists and returns false otherwise; it must
+ * never re-create a deleted record (a blind SET after a concurrent revoke
+ * would resurrect the session). `delete` returns whether THIS call removed
+ * the record — concurrent deleters see true exactly once, which is what
+ * lets rotation refuse to mint a replacement for a concurrently revoked
+ * credential. In redis terms: touch is a conditional write (WATCH/Lua),
+ * delete's result is DEL's returned count.
+ */
 export interface SessionStore {
   get(tokenHash: string): Promise<SessionRecord | null>;
-  /** Insert or replace by tokenHash (used for issuance AND idle touches). */
+  /** Insert a NEW record at issuance (never used to update an existing one). */
   put(record: SessionRecord): Promise<void>;
-  /** true if a record existed and is now gone. */
+  /**
+   * Conditionally set lastSeenAtMs iff the record exists; false = it is
+   * gone (revoked/expired-and-deleted) and MUST be treated as revoked.
+   */
+  touch(tokenHash: string, lastSeenAtMs: number): Promise<boolean>;
+  /** true iff THIS call removed the record (exactly one winner per record). */
   delete(tokenHash: string): Promise<boolean>;
   /**
    * Revoke every session of one user in one realm/tenant scope ("log me out
@@ -57,6 +73,17 @@ export class InMemorySessionStore implements SessionStore {
   put(record: SessionRecord): Promise<void> {
     this.records.set(record.tokenHash, record);
     return Promise.resolve();
+  }
+
+  touch(tokenHash: string, lastSeenAtMs: number): Promise<boolean> {
+    // Map read+write with no await between them: atomic on the event loop,
+    // and a missing record is NEVER re-created (see interface contract).
+    const record = this.records.get(tokenHash);
+    if (record === undefined) {
+      return Promise.resolve(false);
+    }
+    this.records.set(tokenHash, { ...record, lastSeenAtMs });
+    return Promise.resolve(true);
   }
 
   delete(tokenHash: string): Promise<boolean> {

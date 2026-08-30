@@ -47,6 +47,7 @@ function requestInfo(overrides: Partial<GatewayRequestInfo> = {}): GatewayReques
     authorization: null,
     requiredApp: null,
     allowedRealms: null,
+    allowAnonymous: false,
     ...overrides,
   };
 }
@@ -155,7 +156,11 @@ describe("assembled pipeline (context propagation)", () => {
     const context = contextOf();
     await pipeline.run(
       context,
-      requestInfo({ authorization: `Bearer ${issued.token}`, requiredApp: "b2b" }),
+      requestInfo({
+        authorization: `Bearer ${issued.token}`,
+        requiredApp: "b2b",
+        allowedRealms: ["agency"],
+      }),
     );
 
     expect(context.requestId).toBe("req-1");
@@ -242,10 +247,10 @@ describe("AuthRealmStage (verification, issue #32)", () => {
     expect(error.code).toBe("unauthorized");
   }
 
-  it("records an anonymous context when no Authorization header is sent", async () => {
+  it("records an anonymous context on an @AllowAnonymous route with no header", async () => {
     const { stage } = authFixture();
     const context = await tenantResolvedContext();
-    await stage.run(context, requestInfo());
+    await stage.run(context, requestInfo({ allowAnonymous: true }));
     expect(context.auth).toEqual({ state: "anonymous" });
   });
 
@@ -254,13 +259,63 @@ describe("AuthRealmStage (verification, issue #32)", () => {
     const issued = await sessions.issue(AGENCY_PRINCIPAL);
     const context = await tenantResolvedContext();
 
-    await stage.run(context, requestInfo({ authorization: `Bearer ${issued.token}` }));
+    await stage.run(
+      context,
+      requestInfo({ authorization: `Bearer ${issued.token}`, allowedRealms: ["agency"] }),
+    );
     expect(context.auth).toEqual({
       state: "verified",
       realm: "agency",
       principal: AGENCY_PRINCIPAL,
       sessionTokenHash: issued.tokenHash,
     });
+  });
+
+  it("DEFAULT-DENY: an undecorated route is 401 for anonymous AND verified callers", async () => {
+    const { stage, sessions } = authFixture();
+    const issued = await sessions.issue(AGENCY_PRINCIPAL);
+
+    // No @RequiresRealm, no @AllowAnonymous, no credential: refused.
+    await expect401(stage.run(await tenantResolvedContext(), requestInfo()));
+    // Same route with a perfectly VALID session: still refused — a
+    // forgotten decorator is a dead route, not an open one.
+    await expect401(
+      stage.run(
+        await tenantResolvedContext(),
+        requestInfo({ authorization: `Bearer ${issued.token}` }),
+      ),
+    );
+  });
+
+  it("@AllowAnonymous still fully verifies a credential that IS presented", async () => {
+    const { stage, sessions } = authFixture();
+    const issued = await sessions.issue(AGENCY_PRINCIPAL);
+
+    // Valid token on an anonymous-allowed route: verified context.
+    const context = await tenantResolvedContext();
+    await stage.run(
+      context,
+      requestInfo({ allowAnonymous: true, authorization: `Bearer ${issued.token}` }),
+    );
+    expect(context.auth?.state).toBe("verified");
+
+    // Invalid token on the same route: 401, never downgraded to anonymous.
+    await expect401(
+      stage.run(
+        await tenantResolvedContext(),
+        requestInfo({ allowAnonymous: true, authorization: "Bearer agency.never-issued" }),
+      ),
+    );
+  });
+
+  it("@RequiresRealm takes precedence over @AllowAnonymous on the same target", async () => {
+    const { stage } = authFixture();
+    await expect401(
+      stage.run(
+        await tenantResolvedContext(),
+        requestInfo({ allowAnonymous: true, allowedRealms: ["agency"] }),
+      ),
+    );
   });
 
   it("refuses a never-issued credential with the one generic 401", async () => {
@@ -341,7 +396,10 @@ describe("AuthRealmStage (verification, issue #32)", () => {
     const credential = signMachineCredential("key-1", "structural-shared-secret", timestampSeconds);
 
     const context = await tenantResolvedContext();
-    await stage.run(context, requestInfo({ authorization: `Bearer machine.${credential}` }));
+    await stage.run(
+      context,
+      requestInfo({ authorization: `Bearer machine.${credential}`, allowedRealms: ["machine"] }),
+    );
     expect(context.auth).toEqual({
       state: "verified",
       realm: "machine",

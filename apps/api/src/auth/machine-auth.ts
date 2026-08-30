@@ -130,12 +130,15 @@ export class MachineAuthService implements MachineCredentialVerifier {
     const timestampSeconds = Number(timestampText);
 
     const key = await this.keys.getKey(keyId);
+    // Constant crypto cost on EVERY post-parse exit (F4): the one HMAC is
+    // computed before any key-dependent branching — dummy secret when the
+    // key is unknown — so unknown, revoked, stale, and bad-signature
+    // rejections all pay identical work and key ids cannot be enumerated
+    // by timing any rejection path.
+    const expected = createHmac("sha256", key?.secret ?? "jenova-unknown-key-equalizer")
+      .update(machineStringToSign(keyId, timestampSeconds), "utf8")
+      .digest("base64url");
     if (key === null) {
-      // Burn an HMAC anyway so unknown key ids cost the same as bad
-      // signatures — no key-enumeration timing oracle.
-      createHmac("sha256", "jenova-unknown-key-equalizer")
-        .update(machineStringToSign(keyId, timestampSeconds), "utf8")
-        .digest();
       return { ok: false, reason: "unknown_key" };
     }
     if (key.revoked) {
@@ -144,9 +147,6 @@ export class MachineAuthService implements MachineCredentialVerifier {
     if (Math.abs(this.clock() - timestampSeconds * 1000) > this.skewMs) {
       return { ok: false, reason: "stale_timestamp" };
     }
-    const expected = createHmac("sha256", key.secret)
-      .update(machineStringToSign(keyId, timestampSeconds), "utf8")
-      .digest("base64url");
     if (!constantTimeEquals(signature, expected)) {
       return { ok: false, reason: "bad_signature" };
     }

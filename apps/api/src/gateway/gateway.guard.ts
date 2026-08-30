@@ -10,6 +10,7 @@ import { Reflector } from "@nestjs/core";
 import type { Request } from "express";
 import type { AppKey } from "@jenova/domain";
 import {
+  ALLOW_ANONYMOUS_METADATA,
   REQUIRES_APP_METADATA,
   REQUIRES_REALM_METADATA,
   SKIP_GATEWAY_METADATA,
@@ -63,6 +64,8 @@ export class GatewayGuard implements CanActivate {
           REQUIRES_REALM_METADATA,
           targets,
         ) ?? null,
+      allowAnonymous:
+        this.reflector.getAllAndOverride<boolean>(ALLOW_ANONYMOUS_METADATA, targets) === true,
     });
     return true;
   }
