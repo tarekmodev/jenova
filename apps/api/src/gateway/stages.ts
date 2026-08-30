@@ -4,7 +4,7 @@
  * EXACT order, enforced by GatewayPipeline's constructor:
  *   1. tenant_resolution — Host header → tenant (docs/08: tenant resolution
  *      happens BEFORE authentication, so realm lookup knows whose user store)
- *   2. auth_realm       — parse the realm-tagged bearer token (verify: #32)
+ *   2. auth_realm       — parse + VERIFY the realm-tagged bearer token (#32)
  *   3. entitlement      — @RequiresApp(appKey) route metadata vs installed apps
  *   4. rate_limit       — seam only at M0
  *
@@ -14,10 +14,13 @@
  */
 
 import type { AppKey } from "@jenova/domain";
+import type { MachineCredentialVerifier } from "../auth/machine-auth";
+import type { SessionVerifier } from "../auth/session-service";
 import { ApiHttpError } from "./errors";
 import {
   isAuthRealm,
   type AuthContext,
+  type AuthRealm,
   type RequestContext,
 } from "./request-context";
 import type { EntitlementSource } from "./entitlement-source";
@@ -32,6 +35,8 @@ export interface GatewayRequestInfo {
   readonly authorization: string | null;
   /** AppKey from @RequiresApp route metadata; null = route not app-gated. */
   readonly requiredApp: AppKey | null;
+  /** Realms from @RequiresRealm route metadata; null = no realm gate. */
+  readonly allowedRealms: readonly AuthRealm[] | null;
 }
 
 export const GATEWAY_STAGE_ORDER = [
@@ -76,26 +81,72 @@ export class TenantResolutionStage implements GatewayStage {
 }
 
 /**
- * Stage 2: auth realm + session verification STUB.
+ * Stage 2: auth realm + verification (issue #32; docs/08-security.md).
  *
  * Parses the realm-tagged bearer shape `Authorization: Bearer <realm>.<credential>`
- * (realm per docs/08-security.md) and records it UNVERIFIED. It verifies
- * nothing and rejects nothing — cryptographic session verification, and with
- * it 401 semantics, land with #32. The realm typing and AuthContext shape
- * are final.
+ * and verifies it: interactive realms through the realm-bound session
+ * verifier, the machine realm through the HMAC key verifier. Fails closed —
+ * a PRESENT Authorization header that does not verify is a 401, never
+ * silently anonymous — and every refusal is the same generic 401 (no
+ * oracle over why). Finally enforces the route's @RequiresRealm gate.
  */
 export class AuthRealmStage implements GatewayStage {
   readonly name = "auth_realm";
 
-  run(context: RequestContext, request: GatewayRequestInfo): Promise<void> {
-    context.auth = parseRealmTaggedBearer(request.authorization);
-    return Promise.resolve();
+  constructor(
+    private readonly sessions: SessionVerifier,
+    private readonly machineKeys: MachineCredentialVerifier,
+  ) {}
+
+  async run(context: RequestContext, request: GatewayRequestInfo): Promise<void> {
+    const expectedTenantId = context.tenant?.tenantId ?? null;
+    const parsed = parseRealmTaggedBearer(request.authorization);
+
+    if (parsed.state === "anonymous") {
+      if (request.authorization !== null) {
+        // A credential was OFFERED but is not a well-formed realm-tagged
+        // bearer (wrong scheme, unknown realm, missing secret): refuse.
+        throw ApiHttpError.unauthorized();
+      }
+      context.auth = parsed;
+    } else if (parsed.realm === "machine") {
+      const result = await this.machineKeys.verifyMachineCredential(
+        parsed.credential,
+        expectedTenantId,
+      );
+      if (!result.ok) {
+        throw ApiHttpError.unauthorized();
+      }
+      context.auth = result.auth;
+    } else {
+      const result = await this.sessions.verifySession(
+        parsed.realm,
+        parsed.credential,
+        expectedTenantId,
+      );
+      if (!result.ok) {
+        throw ApiHttpError.unauthorized();
+      }
+      context.auth = result.auth;
+    }
+
+    // Route realm gate: cross-realm use of a perfectly valid session is
+    // still a 401 — realm-bound tokens never cross (docs/08).
+    if (
+      request.allowedRealms !== null &&
+      (context.auth.state !== "verified" || !request.allowedRealms.includes(context.auth.realm))
+    ) {
+      throw ApiHttpError.unauthorized();
+    }
   }
 }
 
 const BEARER_PREFIX = /^bearer\s+/i;
 
-export function parseRealmTaggedBearer(authorization: string | null): AuthContext {
+/** Parse product: never `verified` — only the auth stage's verifiers mint that. */
+export type ParsedBearer = Extract<AuthContext, { state: "anonymous" | "unverified" }>;
+
+export function parseRealmTaggedBearer(authorization: string | null): ParsedBearer {
   if (authorization === null || !BEARER_PREFIX.test(authorization)) {
     return { state: "anonymous" };
   }

@@ -1,12 +1,13 @@
 import { Controller, Get, type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import { tenantId, type AppKey, type TenantId } from "@jenova/domain";
+import { subTenantId, tenantId, type AppKey, type TenantId } from "@jenova/domain";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.factory";
+import { SESSION_SERVICE, type SessionService } from "../src/auth/session-service";
 import { API_CONFIG, type ApiConfig } from "../src/config/config";
-import { RequiresApp } from "../src/gateway/decorators";
+import { RequiresApp, RequiresRealm } from "../src/gateway/decorators";
 import { ENTITLEMENT_SOURCE, type EntitlementSource } from "../src/gateway/entitlement-source";
 import { REQUEST_ID_HEADER } from "../src/gateway/request-context.middleware";
 import { TENANT_DIRECTORY, type TenantDirectory } from "../src/gateway/tenant-directory";
@@ -48,6 +49,12 @@ class DemoController {
   @Get("crm")
   @RequiresApp("crm")
   crmGated(): { ok: true } {
+    return { ok: true };
+  }
+
+  @Get("agency-only")
+  @RequiresRealm("agency")
+  agencyOnly(): { ok: true } {
     return { ok: true };
   }
 }
@@ -137,5 +144,61 @@ describe("api e2e", () => {
       .expect(404);
     expect(res.body.error.code).toBe("not_found");
     expect(res.body.error.requestId).toBe(res.headers[REQUEST_ID_HEADER]);
+  });
+
+  describe("realm-gated routes (issue #32)", () => {
+    async function issueSession(realm: "agency" | "consumer"): Promise<string> {
+      const sessions = app.get<SessionService>(SESSION_SERVICE);
+      const issued = await sessions.issue({
+        realm,
+        userId: "user-1",
+        tenantId: KNOWN_TENANT,
+        subTenantId: realm === "agency" ? subTenantId("agency-1") : null,
+      });
+      return issued.token;
+    }
+
+    it("serves the route for a verified session of the required realm", async () => {
+      const token = await issueSession("agency");
+      const res = await request(app.getHttpServer())
+        .get("/demo/agency-only")
+        .set("Host", KNOWN_HOST)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      expect(res.body).toEqual({ ok: true });
+    });
+
+    it("refuses anonymous requests with the generic 401 envelope", async () => {
+      const res = await request(app.getHttpServer())
+        .get("/demo/agency-only")
+        .set("Host", KNOWN_HOST)
+        .expect(401);
+      expect(res.body).toEqual({
+        error: {
+          code: "unauthorized",
+          message: "valid credentials for this realm are required",
+          requestId: res.headers[REQUEST_ID_HEADER],
+        },
+      });
+    });
+
+    it("refuses a VALID session of another realm — realm-bound tokens never cross", async () => {
+      const token = await issueSession("consumer");
+      const res = await request(app.getHttpServer())
+        .get("/demo/agency-only")
+        .set("Host", KNOWN_HOST)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(401);
+      expect(res.body.error.code).toBe("unauthorized");
+    });
+
+    it("refuses a fabricated credential and never echoes it back", async () => {
+      const res = await request(app.getHttpServer())
+        .get("/demo/agency-only")
+        .set("Host", KNOWN_HOST)
+        .set("Authorization", "Bearer agency.gibberish-credential")
+        .expect(401);
+      expect(JSON.stringify(res.body)).not.toContain("gibberish-credential");
+    });
   });
 });

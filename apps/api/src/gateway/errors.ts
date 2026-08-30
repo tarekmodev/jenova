@@ -35,6 +35,19 @@ export class ApiHttpError extends HttpException {
     );
   }
 
+  /**
+   * ONE indistinguishable 401 for every authentication failure — missing,
+   * malformed, unknown, expired, idle, revoked, wrong realm, wrong tenant.
+   * Differentiating would hand attackers an oracle over credential state.
+   */
+  static unauthorized(): ApiHttpError {
+    return new ApiHttpError(
+      "unauthorized",
+      "valid credentials for this realm are required",
+      HttpStatus.UNAUTHORIZED,
+    );
+  }
+
   static appNotInstalled(appKey: string): ApiHttpError {
     return new ApiHttpError(
       "app_not_installed",
