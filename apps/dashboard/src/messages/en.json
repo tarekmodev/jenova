@@ -1,0 +1,49 @@
+{
+  "login": {
+    "title": "Jenova",
+    "subtitle": "Internal Dashboard",
+    "email": "Email",
+    "password": "Password",
+    "totpCode": "Verification code",
+    "totpHint": "Enter the code from your authenticator app",
+    "signIn": "Sign in",
+    "verify": "Verify",
+    "errors": {
+      "unauthorized": "Incorrect email or password",
+      "totp_required": "A verification code is required",
+      "totp_invalid": "The verification code is not valid",
+      "internal_error": "Sign-in failed — please try again"
+    }
+  },
+  "roles": {
+    "admin": "Administrator",
+    "operations": "Operations",
+    "finance": "Finance",
+    "viewer": "Viewer"
+  },
+  "settings": {
+    "account": {
+      "title": "Account settings",
+      "profile": "Profile",
+      "totp": {
+        "title": "Two-step verification (TOTP)",
+        "subtitle": "A rotating code from an authenticator app at sign-in",
+        "enforced": "Your company policy requires two-step verification — enable it below",
+        "enabled": "Enabled",
+        "notEnrolled": "Two-step verification is not enabled for your account",
+        "enable": "Enable",
+        "scan": "Scan the QR code with your authenticator app",
+        "qrAlt": "Enrollment QR code",
+        "manualEntry": "Or enter the key manually:",
+        "codeLabel": "Enter the code shown in the app",
+        "activate": "Confirm activation",
+        "cancel": "Cancel",
+        "activated": "Two-step verification is now enabled",
+        "errors": {
+          "enrollFailed": "Could not start enrollment",
+          "invalidCode": "The code is not valid"
+        }
+      }
+    }
+  }
+}

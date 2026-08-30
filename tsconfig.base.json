@@ -37,7 +37,6 @@
       "@jenova/adapter-ground-hotelbeds-activities": ["./packages/adapters/ground/hotelbeds-activities/src/index.ts"],
       "@jenova/api": ["./apps/api/src/index.ts"],
       "@jenova/worker": ["./apps/worker/src/index.ts"],
-      "@jenova/dashboard": ["./apps/dashboard/src/index.ts"],
       "@jenova/portal-agent": ["./apps/portal-agent/src/index.ts"],
       "@jenova/portal-corporate": ["./apps/portal-corporate/src/index.ts"],
       "@jenova/storefront-b2c": ["./apps/storefront-b2c/src/index.ts"],

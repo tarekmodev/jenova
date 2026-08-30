@@ -1,14 +1,20 @@
 /**
- * Auth module (issues #32/#33): realm-bound sessions, machine-key HMAC
- * verification, and the credential primitives (argon2id passwords, TOTP,
- * recovery codes — pure functions, no providers needed).
+ * Auth module (issues #32/#33, M2 #89): realm-bound sessions, machine-key
+ * HMAC verification, the credential primitives (argon2id passwords, TOTP,
+ * recovery codes), and — since M2 — the tenant-staff login/TOTP endpoints
+ * for the Internal Dashboard, kept exactly on those M0 primitives.
  *
- * The two M0 in-memory stores are per-process and empty at boot — nothing
- * interactive ships yet. Redis/db-backed stores bind to SESSION_STORE /
- * MACHINE_KEY_STORE later; the services and the gateway wiring stay put.
+ * The in-memory session/machine-key/TOTP-replay stores are per-process;
+ * redis/db-backed stores bind to their tokens later — services, endpoints
+ * and the gateway wiring stay put.
  */
 
 import { Module } from "@nestjs/common";
+import type { TenantDbResolver } from "@jenova/db";
+import { API_CONFIG, type ApiConfig } from "../config/config";
+import { ConfigModule } from "../config/config.module";
+import { secretBoxFromConfig, SECRET_BOX, type SecretBox } from "../tenancy/secret-box";
+import { TENANT_DB_RESOLVER, TenantDbModule } from "../tenancy/tenant-db.module";
 import {
   InMemoryMachineKeyStore,
   MACHINE_AUTH,
@@ -18,8 +24,22 @@ import {
 } from "./machine-auth";
 import { SESSION_SERVICE, SessionService } from "./session-service";
 import { InMemorySessionStore, SESSION_STORE, type SessionStore } from "./session-store";
+import { StaffAuthController } from "./staff-auth.controller";
+import { STAFF_AUTH_SERVICE, StaffAuthService } from "./staff-auth.service";
+import { DrizzleStaffUserStore, STAFF_USER_STORE, type StaffUserStore } from "./staff-users";
+import {
+  InMemoryTotpReplayStore,
+  TOTP_REPLAY_STORE,
+  TotpVerifier,
+  type TotpReplayStore,
+} from "./totp";
+
+/** Nest injection token for the process-wide {@link TotpVerifier}. */
+export const TOTP_VERIFIER = Symbol("jenova.api.totpVerifier");
 
 @Module({
+  imports: [ConfigModule, TenantDbModule],
+  controllers: [StaffAuthController],
   providers: [
     { provide: SESSION_STORE, useClass: InMemorySessionStore },
     {
@@ -33,7 +53,43 @@ import { InMemorySessionStore, SESSION_STORE, type SessionStore } from "./sessio
       inject: [MACHINE_KEY_STORE],
       useFactory: (keys: MachineKeyStore) => new MachineAuthService(keys),
     },
+    { provide: TOTP_REPLAY_STORE, useClass: InMemoryTotpReplayStore },
+    {
+      provide: TOTP_VERIFIER,
+      inject: [TOTP_REPLAY_STORE],
+      useFactory: (replay: TotpReplayStore) => new TotpVerifier(replay),
+    },
+    {
+      provide: SECRET_BOX,
+      inject: [API_CONFIG],
+      useFactory: (config: ApiConfig) => secretBoxFromConfig(config),
+    },
+    {
+      provide: STAFF_USER_STORE,
+      inject: [TENANT_DB_RESOLVER],
+      useFactory: (resolver: TenantDbResolver) => new DrizzleStaffUserStore(resolver),
+    },
+    {
+      provide: STAFF_AUTH_SERVICE,
+      inject: [STAFF_USER_STORE, SESSION_SERVICE, TOTP_VERIFIER, SECRET_BOX],
+      useFactory: (
+        store: StaffUserStore,
+        sessions: SessionService,
+        totp: TotpVerifier,
+        secrets: SecretBox,
+      ) => new StaffAuthService(store, sessions, totp, secrets),
+    },
   ],
-  exports: [SESSION_STORE, SESSION_SERVICE, MACHINE_KEY_STORE, MACHINE_AUTH],
+  exports: [
+    SESSION_STORE,
+    SESSION_SERVICE,
+    MACHINE_KEY_STORE,
+    MACHINE_AUTH,
+    TOTP_REPLAY_STORE,
+    TOTP_VERIFIER,
+    SECRET_BOX,
+    STAFF_USER_STORE,
+    STAFF_AUTH_SERVICE,
+  ],
 })
 export class AuthModule {}

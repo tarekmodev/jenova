@@ -50,6 +50,22 @@ export const appInstallations = pgTable(
   (t) => [uniqueIndex("app_installation_tenant_app_key").on(t.tenantId, t.appKey)],
 );
 
+/**
+ * Host → tenant binding the gateway's tenant-resolution stage reads
+ * (0002_tenant_hosts). One tenant serves many hosts (dashboard, portals,
+ * storefront domains); every host belongs to exactly one tenant. Hosts are
+ * stored normalized: lowercase, no port — exactly what
+ * `normalizeHost` in the gateway produces.
+ */
+export const tenantHosts = pgTable("tenant_host", {
+  host: text("host").primaryKey(),
+  tenantId: uuid("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" })
+    .$type<TenantId>(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
 /** Jenova staff (Platform Admin console). Hardware-key 2FA lands with the auth app. */
 export const platformUsers = pgTable("platform_user", {
   id: uuid("id").primaryKey().defaultRandom(),

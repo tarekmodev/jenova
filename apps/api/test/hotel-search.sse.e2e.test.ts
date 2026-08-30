@@ -42,6 +42,8 @@ const testConfig: ApiConfig = Object.freeze({
   tenantRuntimeDsn: "postgres://jenova_app:jenova_app@localhost:5432/postgres",
   offerSigningKey: "dev-only-offer-signing-key-change-me-0000",
   hotelSearchBudgetMs: 8_000,
+  dataKey: null,
+  dataKeyId: "env-v1",
 });
 
 const KNOWN_HOST = "tenant-one.example.test";
