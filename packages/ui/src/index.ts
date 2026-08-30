@@ -42,6 +42,39 @@ export {
   type JenovaThemeProviderProps,
 } from "./providers/JenovaThemeProvider";
 
+// Shell primitives
+export {
+  AppShell,
+  useAppShell,
+  type AppShellProps,
+  type AppShellContextValue,
+} from "./shell/AppShell";
+export { NavSection, type NavSectionProps } from "./shell/NavSection";
+export {
+  filterNavByEntitlements,
+  navBranchContains,
+  type NavItem,
+} from "./shell/navigation";
+export { DataTable, type DataTableProps, type DataTableColumn } from "./shell/DataTable";
+export {
+  sortRows,
+  toggleSort,
+  type SortDirection,
+  type TableSortState,
+} from "./shell/tableSort";
+export { FormField, type FormFieldProps } from "./shell/FormField";
+export { ConfirmDialog, type ConfirmDialogProps } from "./shell/ConfirmDialog";
+export { ToastProvider, useToast, type ToastApi, type ToastOptions } from "./shell/Toast";
+export { PageHeader, type PageHeaderProps } from "./shell/PageHeader";
+export {
+  EmptyState,
+  ErrorState,
+  ForbiddenState,
+  LoadingState,
+  type StatusStateProps,
+  type LoadingStateProps,
+} from "./shell/StatusStates";
+
 // Curated MUI re-exports — the wrapper surface for dashboard-class apps.
 // Layout & structure
 export {
