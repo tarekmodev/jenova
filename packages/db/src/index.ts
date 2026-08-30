@@ -52,6 +52,20 @@ export {
 } from "./tenant/schema";
 
 export {
+  createTenantDatabase,
+  tenantDbName,
+  type CreateTenantDatabaseOptions,
+  type ProvisionResult,
+} from "./provisioning";
+
+export {
+  createTenantDbResolver,
+  type TenantDb,
+  type TenantDbResolver,
+  type TenantDbResolverOptions,
+} from "./resolver";
+
+export {
   TenantNotFoundError,
   TenantNotProvisionedError,
   TenantAlreadyProvisionedError,
