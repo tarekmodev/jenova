@@ -217,6 +217,10 @@ importers:
         version: 4.1.11(vite@8.2.2)
 
   packages/supplier-sdk:
+    dependencies:
+      '@jenova/domain':
+        specifier: workspace:*
+        version: link:../domain
     devDependencies:
       typescript:
         specifier: 'catalog:'
