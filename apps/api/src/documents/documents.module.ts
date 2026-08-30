@@ -18,11 +18,13 @@ import {
 } from "../tenancy/tenant-db.module";
 import { HotelBookingModule } from "../hotel-booking/hotel-booking.module";
 import { DOCUMENTS_SERVICE } from "./documents.tokens";
+import { VoucherController } from "./voucher.controller";
 
 export { DOCUMENTS_SERVICE } from "./documents.tokens";
 
 @Module({
   imports: [ConfigModule, TenantDbModule, HotelBookingModule],
+  controllers: [VoucherController],
   providers: [
     {
       provide: DOCUMENTS_SERVICE,

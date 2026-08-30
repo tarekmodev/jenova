@@ -40,4 +40,44 @@ describe("worker config", () => {
       WorkerConfigError,
     );
   });
+
+  it("documents delivery (M2 #100) is disabled when neither S3 nor SMTP is configured", () => {
+    expect(loadWorkerConfig(VALID).documentsDelivery).toBeNull();
+  });
+
+  it("documents delivery: full S3 + SMTP blocks enable it with defaults", () => {
+    const config = loadWorkerConfig({
+      ...VALID,
+      S3_ENDPOINT: "http://localhost:9000",
+      S3_REGION: "me-south-1",
+      S3_ACCESS_KEY_ID: "jenova",
+      S3_SECRET_ACCESS_KEY: "jenova-minio",
+      S3_BUCKET: "jenova-dev",
+      S3_FORCE_PATH_STYLE: "true",
+      SMTP_HOST: "localhost",
+      SMTP_PORT: "1025",
+      MAIL_FROM: "vouchers@jenova.local",
+    });
+    expect(config.documentsDelivery).toEqual({
+      s3: {
+        endpoint: "http://localhost:9000",
+        region: "me-south-1",
+        accessKeyId: "jenova",
+        secretAccessKey: "jenova-minio",
+        bucket: "jenova-dev",
+        forcePathStyle: true,
+      },
+      smtp: { host: "localhost", port: 1025 },
+      from: "vouchers@jenova.local",
+      typstBin: "typst",
+      intervalMs: 30_000,
+    });
+  });
+
+  it("documents delivery: a partial block fails fast naming what is missing (all-or-nothing)", () => {
+    const partial = { ...VALID, SMTP_HOST: "localhost" };
+    expect(() => loadWorkerConfig(partial)).toThrow(WorkerConfigError);
+    expect(() => loadWorkerConfig(partial)).toThrow(/MAIL_FROM[\s\S]*all-or-nothing/);
+    expect(() => loadWorkerConfig(partial)).toThrow(/S3_ENDPOINT/);
+  });
 });

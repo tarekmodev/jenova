@@ -49,3 +49,21 @@ export {
   type RenderedVoucher,
   type StoredVoucher,
 } from "./documents-service";
+
+export {
+  RecordingMailSender,
+  SmtpMailSender,
+  type MailAttachment,
+  type MailSender,
+  type OutboundMail,
+  type SmtpMailSenderConfig,
+} from "./mail";
+
+export { buildVoucherEmail, type VoucherEmailContent } from "./email";
+
+export {
+  VoucherDeliveryConsumer,
+  type DeliveryReport,
+  type VoucherDeliveryDeps,
+  type VoucherDeliveryOptions,
+} from "./delivery";
