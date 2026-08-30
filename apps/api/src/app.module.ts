@@ -11,12 +11,13 @@
 import { Module } from "@nestjs/common";
 import { API_CONFIG, loadApiConfig } from "./config/config";
 import { GatewayModule } from "./gateway/gateway.module";
+import { PricingModule } from "./pricing/pricing.module";
 import { HealthController } from "./health/health.controller";
 import { READINESS_CHECKS } from "./health/readiness";
 import { HTTP_SERVER_HOOKS, noopHttpServerHooks } from "./observability/instrumentation";
 
 @Module({
-  imports: [GatewayModule],
+  imports: [GatewayModule, PricingModule],
   controllers: [HealthController],
   providers: [
     {
