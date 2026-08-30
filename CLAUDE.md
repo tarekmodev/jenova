@@ -61,6 +61,12 @@ live in `docs/` — read the doc for whatever you touch before writing code:
 ## Working agreements
 - **Scope:** one agent, one package/app, per the active milestone file. Do not start work
   outside the current milestone without Tarek's explicit direction.
+- **Tracking:** GitHub issues on tarekmodev/jenova are the board. Every milestone is
+  decomposed at kickoff, and any issue too big for one PR gets **GitHub sub-issues**
+  (native parent/child) — decompose as you work, whenever needed. Every PR closes its
+  issue(s) and ticks the matching milestone-doc checklist items.
+- **Isolation:** background agents always work in their own git worktree — never in the
+  lead session's checkout.
 - **Contracts before code:** interfaces + tests agreed before implementation. An adapter
   is "done" when the shared contract suite passes on recordings AND live sandbox.
 - **Human review required** (no exceptions, never self-merge): ledger, payments, booking
