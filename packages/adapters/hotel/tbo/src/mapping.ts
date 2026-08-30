@@ -14,7 +14,7 @@ import {
   type Money,
 } from "@jenova/domain";
 import type { BoardBasis } from "@jenova/supplier-sdk";
-import type { TboCancelPolicy, TboRoom } from "./schemas";
+import type { TboCancelPolicy, TboHotelResult, TboRoom } from "./schemas";
 
 // ---------------------------------------------------------------------------
 // Canonical property ids
@@ -244,8 +244,26 @@ export interface MappedOffer {
 }
 
 /**
+ * A room rate dropped because its supplier vocabulary could not be
+ * normalized. Vocabulary drift must be VISIBLE (review M1): if TBO ships a
+ * new meal-type spelling, inventory silently vanishing tenant-wide is not
+ * acceptable — observers log it and feed the supplier health board counter.
+ * Carries only the unrecognized raw value, never payload dumps.
+ */
+export interface SkippedRoomRateEvent {
+  readonly supplierCode: string;
+  readonly hotelCode: string;
+  readonly field: "MealType";
+  readonly rawValue: string;
+}
+
+/** Observation seam for skipped rooms — the TransportHooks idiom. */
+export type SkippedRoomRateObserver = (event: SkippedRoomRateEvent) => void;
+
+/**
  * Map one TBO room rate to a canonical offer. Returns undefined when the
- * meal type cannot be normalized (the room is skipped, never mislabeled).
+ * meal type cannot be normalized (the room is skipped, never mislabeled —
+ * callers surface the skip via {@link SkippedRoomRateObserver}).
  * `nationality` is the GuestNationality the search was priced with — TBO
  * takes it as a first-class request parameter and prices against it.
  */
@@ -259,6 +277,43 @@ export function mapRoomToOffer(
   if (boardBasis === undefined) {
     return undefined;
   }
+  return mapRoom(room, hotelCode, currency, nationality, boardBasis);
+}
+
+/**
+ * Map every room of one HotelResult, reporting each skipped rate to the
+ * observer. The adapter's search loop runs on this so drift is counted in
+ * one place.
+ */
+export function mapHotelRooms(
+  hotel: TboHotelResult,
+  nationality: string,
+  onSkippedRoomRate?: SkippedRoomRateObserver,
+): MappedOffer[] {
+  const offers: MappedOffer[] = [];
+  for (const room of hotel.Rooms) {
+    const boardBasis = normalizeBoardBasis(room.MealType);
+    if (boardBasis === undefined) {
+      onSkippedRoomRate?.({
+        supplierCode: "tbo",
+        hotelCode: hotel.HotelCode,
+        field: "MealType",
+        rawValue: room.MealType,
+      });
+      continue;
+    }
+    offers.push(mapRoom(room, hotel.HotelCode, hotel.Currency, nationality, boardBasis));
+  }
+  return offers;
+}
+
+function mapRoom(
+  room: TboRoom,
+  hotelCode: string,
+  currency: string,
+  nationality: string,
+  boardBasis: BoardBasis,
+): MappedOffer {
   const net = tboAmountToMoney(room.TotalFare, currency);
   const roomName = room.Name[0] ?? "";
   const cancellationPolicy = mapCancellationPolicy(room.CancelPolicies, net, room.IsRefundable);

@@ -16,9 +16,11 @@ Content helpers (recording tooling and future static-content sync):
 
 Everything in this package is derived from **real recorded sandbox traffic**
 (`packages/sandbox-replay/recordings/tbo`, sanitized; CLAUDE.md rule 5).
-The recorded certification booking: confirmation `LVFXI5` — Riyadh
-"Comfort Inn Taawn" studio, 139.73 USD, refundable — booked live on
-2026-08-30 and cancelled immediately.
+The recorded certification booking: confirmation `LV****` (masked in prose;
+the full reference necessarily appears inside the recordings — replay keys
+on request bodies — and is a cancelled sandbox reservation with a synthetic
+holder) — Riyadh "Comfort Inn Taawn" studio, 139.73 USD, refundable —
+booked live on 2026-08-30 and cancelled immediately.
 
 ## Credentials
 
@@ -80,7 +82,10 @@ Unknown `BookingStatus` vocabulary on BookingDetail fails loudly as
 - **Board basis.** Observed meal types `Room_Only`, `BreakFast`,
   `Breakfast_For_2` (+ documented `Half_Board`, `Full_Board`,
   `All_Inclusive`) normalize to RO/BB/HB/FB/AI by word match. Unknown values
-  skip the room — never mislabel it.
+  skip the room — never mislabel it, and never silently: every skip is
+  reported through the adapter's `onSkippedRoomRate` seam (structured warn +
+  per-value counter; the registry exposes it as `hotelVocabularyDrift` for
+  the Platform Admin supplier health board).
 - **Canonical property ids.** `tbo:<HotelCode>` until the licensed mapping
   service lands (M3); the contract (canonical ids in and out) is final.
 - **Nationality.** First-class: `GuestNationality` is sent on every search

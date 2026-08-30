@@ -1,6 +1,6 @@
 /**
  * check / book / retrieve / cancel over the recorded live lifecycle
- * (booking LVFXI5: Riyadh studio, 139.73 USD, refundable — booked on the
+ * (booking LV****: Riyadh studio, 139.73 USD, refundable — booked on the
  * real sandbox on 2026-08-30 and cancelled immediately). Replay resolves
  * the exact requests the adapter builds; the fingerprints break loudly if
  * the request shapes drift.
@@ -22,7 +22,12 @@ import {
 import { makeTestContext } from "./test-context";
 import { createTboTransport } from "./transport";
 
-/** The confirmation number of the recorded certification booking. */
+/**
+ * The confirmation number of the recorded certification booking — request
+ * DATA that must byte-match the committed BookingDetail/Cancel recordings
+ * (replay keys on the request body), so unlike prose it is not masked. The
+ * reservation is cancelled and holder data synthetic.
+ */
 const RECORDED_CONFIRMATION_NUMBER = "LVFXI5";
 
 function makeAdapter() {
@@ -73,7 +78,7 @@ describe("TBO check (PreBook)", () => {
   });
 });
 
-describe("TBO book / retrieve / cancel (recorded booking LVFXI5)", () => {
+describe("TBO book / retrieve / cancel (recorded certification booking)", () => {
   it("books with the clientReference passed through and echoed by TBO", async () => {
     const ctx = makeTestContext();
     const checked = await makeAdapter().check(ctx, (await searchAndPick()).supplierOfferToken);

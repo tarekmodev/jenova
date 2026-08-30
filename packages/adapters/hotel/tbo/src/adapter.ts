@@ -35,12 +35,15 @@ import {
   TBO_STATUS_NO_ROOMS,
   TBO_STATUS_OK,
 } from "./errors";
+import { createSkippedRoomRateLog } from "./diagnostics";
 import {
   decodeOfferToken,
   mapCancellationPolicy,
+  mapHotelRooms,
   mapRoomToOffer,
   tboAmountToMoney,
   toTboHotelCode,
+  type SkippedRoomRateObserver,
 } from "./mapping";
 import {
   tboBookingDetailResponseSchema,
@@ -53,6 +56,14 @@ import {
 export interface TboHotelAdapterOptions {
   /** The wired transport seam (createTboTransport: live, record or replay). */
   readonly transport: Transport;
+  /**
+   * Observation seam for supplier vocabulary drift (review M1): called once
+   * per room rate a search skips because its MealType could not be
+   * normalized. Defaults to a structured warn + counter
+   * (createSkippedRoomRateLog); the registry injects its own so the
+   * supplier health board can read the counts.
+   */
+  readonly onSkippedRoomRate?: SkippedRoomRateObserver;
 }
 
 /**
@@ -72,9 +83,12 @@ class TboHotelAdapter implements HotelSupplierAdapter {
   readonly supplierCode = TBO_SUPPLIER_CODE;
   readonly vertical = "hotel" as const;
   readonly client: TboClient;
+  readonly #onSkippedRoomRate: SkippedRoomRateObserver;
 
   constructor(options: TboHotelAdapterOptions) {
     this.client = new TboClient(options.transport);
+    this.#onSkippedRoomRate =
+      options.onSkippedRoomRate ?? createSkippedRoomRateLog().observer;
   }
 
   async search(
@@ -117,12 +131,9 @@ class TboHotelAdapter implements HotelSupplierAdapter {
     }
     const offers: HotelOffer[] = [];
     for (const hotel of body.HotelResult ?? []) {
-      for (const room of hotel.Rooms) {
-        const offer = mapRoomToOffer(room, hotel.HotelCode, hotel.Currency, ctx.nationality);
-        if (offer !== undefined) {
-          offers.push(offer);
-        }
-      }
+      // Unmappable rooms are skipped, never mislabeled — and every skip is
+      // reported so supplier vocabulary drift stays visible (review M1).
+      offers.push(...mapHotelRooms(hotel, ctx.nationality, this.#onSkippedRoomRate));
     }
     return offers;
   }

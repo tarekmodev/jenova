@@ -17,6 +17,12 @@ describe("supplier registry", () => {
   it("throws UnknownSupplierError for an unregistered code", () => {
     const registry = createSupplierRegistry({ mode: "replay" });
     expect(() => registry.hotelAdapter("not-a-supplier")).toThrow(UnknownSupplierError);
+    expect(() => registry.hotelVocabularyDrift("not-a-supplier")).toThrow(UnknownSupplierError);
+  });
+
+  it("exposes a per-supplier vocabulary-drift counter for the health board", () => {
+    const registry = createSupplierRegistry({ mode: "replay" });
+    expect(registry.hotelVocabularyDrift("tbo").size).toBe(0);
   });
 
   it("maps NODE_ENV to the transport mode per docs/09", () => {

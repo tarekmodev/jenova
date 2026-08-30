@@ -9,7 +9,7 @@ recorded traffic powering CI. No UI yet beyond API endpoints.
       retrieve, cancel against the live sandbox; full normalization (Money, UTC policy
       deadlines, occupancy, board basis, error taxonomy); recordings captured for every
       scenario the sandbox can produce (ok, sold_out, price_changed, timeout).
-      (#49: full lifecycle proven live — booking LVFXI5 booked and cancelled;
+      (#49: full lifecycle proven live — booking LV**** booked and cancelled;
       rate_limited unreachable without violating look-to-book, documented in the
       adapter README.)
 - [ ] **Search & availability service** (`api/hotel-search`): fan-out orchestrator

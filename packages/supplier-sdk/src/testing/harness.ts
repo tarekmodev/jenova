@@ -191,6 +191,12 @@ export function describeHotelAdapterContract(
         }
         const ctx = makeContext();
         bookRequest = happyPath.makeBookRequest(checkedOffer);
+        // Guard the echo assertion against vacuous "" === "" (review L1):
+        // an empty clientReference would void the idempotency check.
+        expect(
+          bookRequest.clientReference.length,
+          "the book scenario must supply a non-empty clientReference",
+        ).toBeGreaterThan(0);
         booked = await adapter.book(ctx, bookRequest);
         assertHotelBookingRecord(booked);
         expect(booked.clientReference).toBe(bookRequest.clientReference);
