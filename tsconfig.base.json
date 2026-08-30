@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "paths": {
+      "@jenova/domain": ["./packages/domain/src/index.ts"],
+      "@jenova/db": ["./packages/db/src/index.ts"],
+      "@jenova/supplier-sdk": ["./packages/supplier-sdk/src/index.ts"],
+      "@jenova/sandbox-replay": ["./packages/sandbox-replay/src/index.ts"],
+      "@jenova/fiscal-sa": ["./packages/fiscal-sa/src/index.ts"],
+      "@jenova/connectors": ["./packages/connectors/src/index.ts"],
+      "@jenova/ui": ["./packages/ui/src/index.ts"],
+      "@jenova/adapter-hotel-tbo": ["./packages/adapters/hotel/tbo/src/index.ts"],
+      "@jenova/adapter-hotel-ratehawk": ["./packages/adapters/hotel/ratehawk/src/index.ts"],
+      "@jenova/adapter-hotel-hotelbeds": ["./packages/adapters/hotel/hotelbeds/src/index.ts"],
+      "@jenova/adapter-air-mystifly": ["./packages/adapters/air/mystifly/src/index.ts"],
+      "@jenova/adapter-ground-hotelbeds-transfers": ["./packages/adapters/ground/hotelbeds-transfers/src/index.ts"],
+      "@jenova/adapter-ground-hotelbeds-activities": ["./packages/adapters/ground/hotelbeds-activities/src/index.ts"],
+      "@jenova/api": ["./apps/api/src/index.ts"],
+      "@jenova/worker": ["./apps/worker/src/index.ts"],
+      "@jenova/dashboard": ["./apps/dashboard/src/index.ts"],
+      "@jenova/portal-agent": ["./apps/portal-agent/src/index.ts"],
+      "@jenova/portal-corporate": ["./apps/portal-corporate/src/index.ts"],
+      "@jenova/storefront-b2c": ["./apps/storefront-b2c/src/index.ts"],
+      "@jenova/platform-admin": ["./apps/platform-admin/src/index.ts"]
+    }
+  }
+}
