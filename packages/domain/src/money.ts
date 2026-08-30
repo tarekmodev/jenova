@@ -56,9 +56,14 @@ export function assertValidMoney(value: Money): void {
   }
 }
 
+/** Collapses IEEE negative zero — `-0` must never be stored in an amount. */
+function normalizeZero(amount: number): number {
+  return amount === 0 ? 0 : amount;
+}
+
 /** Validating constructor — the only way Money values should be created. */
 export function money(amount: number, currency: string): Money {
-  const value: Money = { amount, currency };
+  const value: Money = { amount: normalizeZero(amount), currency };
   assertValidMoney(value);
   return value;
 }
@@ -79,7 +84,7 @@ function safeResult(amount: number, currency: string, op: string): Money {
   if (!Number.isSafeInteger(amount)) {
     throw new InvalidMoneyError(`${op} overflowed the safe integer range`);
   }
-  return { amount, currency };
+  return { amount: normalizeZero(amount), currency };
 }
 
 export function add(a: Money, b: Money): Money {
@@ -121,7 +126,7 @@ export function multiplyByScalar(m: Money, scalar: number): Money {
   if (rounded > BigInt(Number.MAX_SAFE_INTEGER) || rounded < BigInt(Number.MIN_SAFE_INTEGER)) {
     throw new InvalidMoneyError("multiplyByScalar overflowed the safe integer range");
   }
-  return { amount: Number(rounded), currency: m.currency };
+  return { amount: normalizeZero(Number(rounded)), currency: m.currency };
 }
 
 /** Exact decimal decomposition of a scalar into a bigint ratio. */
