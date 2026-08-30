@@ -6,7 +6,18 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@jenova/booking-engine": "workspace:*",
+    "@jenova/db": "workspace:*",
+    "@jenova/domain": "workspace:*",
+    "@jenova/supplier-registry": "workspace:*",
+    "@jenova/supplier-sdk": "workspace:*",
+    "bullmq": "^5.66.5",
+    "drizzle-orm": "^0.45.2",
+    "ioredis": "^5.9.3",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/node": "^22.18.0",
