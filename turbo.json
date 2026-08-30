@@ -9,7 +9,8 @@
       "dependsOn": ["^build"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "env": ["DOCUMENTS_TYPST_BIN", "JENOVA_TEST_PG_URL", "JENOVA_REQUIRE_PG"]
     }
   }
 }

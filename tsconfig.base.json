@@ -24,6 +24,7 @@
       "@jenova/supplier-sdk": ["./packages/supplier-sdk/src/index.ts"],
     "@jenova/supplier-registry": ["./packages/supplier-registry/src/index.ts"],
     "@jenova/booking-engine": ["./packages/booking-engine/src/index.ts"],
+    "@jenova/documents": ["./packages/documents/src/index.ts"],
       "@jenova/supplier-sdk/testing": ["./packages/supplier-sdk/src/testing/index.ts"],
       "@jenova/sandbox-replay": ["./packages/sandbox-replay/src/index.ts"],
       "@jenova/fiscal-sa": ["./packages/fiscal-sa/src/index.ts"],
