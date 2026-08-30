@@ -48,6 +48,41 @@ async function main(): Promise<void> {
       return call("hotelCodeList", { CityCode: args[0], IsDetailedResponse: "false" });
     case "hotelDetails":
       return call("hotelDetails", { Hotelcodes: args[0], Language: "EN" });
+    case "searchRaw": {
+      // Error-scenario searches (bad codes, far-future no-availability):
+      // same payload shape the adapter builds, distinct fingerprints.
+      const [hotelCodes, checkIn, checkOut] = args;
+      return call("search", {
+        CheckIn: checkIn,
+        CheckOut: checkOut,
+        HotelCodes: hotelCodes,
+        GuestNationality: "SA",
+        PaxRooms: [{ Adults: 1, Children: 0, ChildrenAges: [] }],
+        ResponseTime: 23.0,
+        IsDetailedResponse: true,
+      });
+    }
+    case "searchBadAuth": {
+      // auth_failed scenario: wrong password from a SCRATCH variable (the
+      // real .env is untouched); the sanitized recording keeps only the
+      // 401 response, and credentials never enter the fingerprint.
+      const [hotelCodes, checkIn, checkOut] = args;
+      return call(
+        "search",
+        {
+          CheckIn: checkIn,
+          CheckOut: checkOut,
+          HotelCodes: hotelCodes,
+          GuestNationality: "SA",
+          PaxRooms: [{ Adults: 1, Children: 0, ChildrenAges: [] }],
+          ResponseTime: 23.0,
+          IsDetailedResponse: true,
+        },
+        { password: process.env["TBO_HOTEL_SCRATCH_PASSWORD"] ?? "jenova-wrong-password-probe" },
+      );
+    }
+    case "cancelRaw":
+      return call("cancel", { ConfirmationNumber: args[0] });
     case "search": {
       // The canonical recorded scenario, through the real adapter, so the
       // recording fingerprint always matches what the adapter sends.

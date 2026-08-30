@@ -69,6 +69,50 @@ export function makeRecordedBookRequest(checkedOffer: HotelOffer): HotelBookRequ
   };
 }
 
+// ---------------------------------------------------------------------------
+// Error scenarios (M1.a4 #57) — every recording is a REAL sandbox failure
+// ---------------------------------------------------------------------------
+
+/**
+ * A BookingCode from the first live search session, PreBooked again after it
+ * expired: TBO answers 201 "No Available rooms for given criteria"
+ * (recorded) — expiry and sold-out are indistinguishable on PreBook.
+ */
+export const RECORDED_EXPIRED_BOOKING_CODE =
+  "1065918!TB!1!TB!6acadf51-a48b-11f1-a512-aa71e0cecaa6!TB!N!TB!AFF!";
+
+/** CheckOut before CheckIn → Status 400 "Invalid date entered…" (recorded). */
+export const RECORDED_INVALID_DATES_QUERY: HotelSearchQuery = {
+  target: { kind: "properties", canonicalPropertyIds: ["tbo:1065918"] },
+  checkIn: "2026-10-14",
+  checkOut: "2026-10-13",
+  rooms: [{ adults: 1, childAges: [] }],
+};
+
+/**
+ * The query recorded with a deliberately wrong password (scratch variable —
+ * the real .env was never touched): HTTP 200 with Status 401 "Access
+ * Credentials is incorrect". Credentials never enter the fingerprint, so
+ * this scenario needs its own query shape to stay distinct.
+ */
+export const RECORDED_BAD_AUTH_QUERY: HotelSearchQuery = {
+  target: { kind: "properties", canonicalPropertyIds: ["tbo:1032860"] },
+  checkIn: "2026-10-13",
+  checkOut: "2026-10-14",
+  rooms: [{ adults: 1, childAges: [] }],
+};
+
+/** A hotel code TBO has no property for → 201, mapped to an empty search. */
+export const RECORDED_UNKNOWN_HOTEL_QUERY: HotelSearchQuery = {
+  target: { kind: "properties", canonicalPropertyIds: ["tbo:999999999"] },
+  checkIn: "2026-10-13",
+  checkOut: "2026-10-14",
+  rooms: [{ adults: 1, childAges: [] }],
+};
+
+/** Cancel → 479 "No Itinerary exist for this input" (recorded). */
+export const RECORDED_UNKNOWN_CONFIRMATION = "JENOVAX";
+
 /**
  * The rate the lifecycle recording books: the cheapest refundable offer
  * whose penalty is currently zero (free cancellation window still open), so

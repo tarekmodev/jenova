@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "supplier": "tbo",
+  "fingerprint": "post-api-tbotechnology-in-tboholidays-hotelapi-search-19255062e326",
+  "request": {
+    "method": "POST",
+    "url": "https://api.tbotechnology.in/TBOHolidays_HotelAPI/search",
+    "headers": {
+      "accept": "application/json",
+      "authorization": "[REDACTED]",
+      "content-type": "application/json"
+    },
+    "body": "{\"CheckIn\":\"2026-10-13\",\"CheckOut\":\"2026-10-14\",\"HotelCodes\":\"1032860\",\"GuestNationality\":\"SA\",\"PaxRooms\":[{\"Adults\":1,\"Children\":0,\"ChildrenAges\":[]}],\"ResponseTime\":23,\"IsDetailedResponse\":true}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "keep-alive",
+      "content-encoding": "gzip",
+      "content-length": "95",
+      "content-type": "application/json",
+      "date": "Sun, 30 Aug 2026 16:22:46 GMT",
+      "sessionid": "[REDACTED]",
+      "vary": "Accept-Encoding"
+    },
+    "body": "{\"Status\":{\"Code\":401,\"Description\":\"Access Credentials is incorrect\"}}"
+  },
+  "timings": {
+    "durationMs": 308
+  }
+}

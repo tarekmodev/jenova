@@ -13,34 +13,37 @@ import type { TboStatus } from "./schemas";
 
 /** TBO Status.Code values observed on real sandbox responses. */
 export const TBO_STATUS_OK = 200;
-/** search: "No Available rooms for given criteria" — empty result, not an error. */
+/**
+ * "No Available rooms for given criteria" — observed live on a broad search
+ * with no availability AND on PreBook of an expired BookingCode (TBO does
+ * not distinguish expiry from sold-out). search maps it to an empty result;
+ * every other operation maps it to sold_out.
+ */
 export const TBO_STATUS_NO_ROOMS = 201;
 
 /**
- * Status.Code → taxonomy kind for non-OK envelopes. Codes observed live are
- * documented in README.md; anything unlisted is supplier_rejected (the
- * supplier answered and refused).
+ * Status.Code → taxonomy kind for non-OK envelopes, from REAL recorded
+ * sandbox failures (each code's recording is committed; the full observed
+ * catalogue is the README's taxonomy table):
+ *   201 "No Available rooms for given criteria"            → sold_out
+ *   400 "Invalid date entered. CheckIn date should be…"    → invalid_request
+ *   400 "Booking does not exist for the requested input"   → invalid_request
+ *   401 "Access Credentials is incorrect" (HTTP 200!)      → auth_failed
+ *   479 "No Itinerary exist for this input"                → supplier_rejected
+ * Anything unlisted is supplier_rejected (the supplier answered and
+ * refused); timeouts/aborts never reach here (the transport raises
+ * supplier_timeout itself).
  */
 const STATUS_KIND: ReadonlyMap<number, SupplierErrorKind> = new Map([
   [TBO_STATUS_NO_ROOMS, "sold_out"],
+  [400, "invalid_request"],
+  [401, "auth_failed"],
+  [403, "auth_failed"],
+  [429, "rate_limited"],
+  [479, "supplier_rejected"],
 ]);
 
-/**
- * Description-based refinement for TBO's catch-all codes: the sandbox
- * reports several distinct failures under one Status.Code, so the
- * description text (recorded verbatim in recordings/tbo) disambiguates.
- */
-const DESCRIPTION_KIND: readonly { pattern: RegExp; kind: SupplierErrorKind }[] = [];
-
 export function supplierErrorFromStatus(status: TboStatus, operation: string): SupplierError {
-  for (const { pattern, kind } of DESCRIPTION_KIND) {
-    if (pattern.test(status.Description)) {
-      return new SupplierError(kind, `TBO ${operation}: ${status.Description}`, {
-        supplierCode: String(status.Code),
-        raw: status,
-      });
-    }
-  }
   const kind = STATUS_KIND.get(status.Code) ?? "supplier_rejected";
   return new SupplierError(kind, `TBO ${operation}: ${status.Description}`, {
     supplierCode: String(status.Code),
