@@ -50,9 +50,63 @@ export const tboHotelResultSchema = z.object({
 });
 export type TboHotelResult = z.infer<typeof tboHotelResultSchema>;
 
-/** POST /search — {"Status":…,"HotelResult":[…]} (absent on no-availability). */
+/**
+ * POST /search and POST /PreBook — {"Status":…,"HotelResult":[…]} (absent on
+ * no-availability). PreBook returns the same shape narrowed to the one
+ * revalidated rate (verified on the recorded PreBook response).
+ */
 export const tboSearchResponseSchema = z.object({
   Status: tboStatusSchema,
   HotelResult: z.array(tboHotelResultSchema).optional(),
 });
 export type TboSearchResponse = z.infer<typeof tboSearchResponseSchema>;
+
+/** POST /Book — envelope + references echoed back. */
+export const tboBookResponseSchema = z.object({
+  Status: tboStatusSchema,
+  ConfirmationNumber: z.string().optional(),
+  ClientReferenceId: z.string().optional(),
+});
+export type TboBookResponse = z.infer<typeof tboBookResponseSchema>;
+
+/**
+ * One room on a stored booking (BookingDetail.Rooms[], recorded live):
+ * fare/tax/policies live PER ROOM; there is no booking-level total. The
+ * response does NOT echo ClientReferenceId — only Book's response does
+ * (verified live, recorded).
+ */
+export const tboBookedRoomSchema = z.object({
+  Currency: z.string().min(1),
+  /** e.g. "Not Cancelled" — room-level supplier state, diagnostics only. */
+  Status: z.string().optional(),
+  Name: z.array(z.string()).optional(),
+  TotalFare: z.number(),
+  TotalTax: z.number().optional(),
+  CancelPolicies: z.array(tboCancelPolicySchema).optional(),
+  MealType: z.string().optional(),
+  IsRefundable: z.boolean().optional(),
+});
+export type TboBookedRoom = z.infer<typeof tboBookedRoomSchema>;
+
+/** POST /BookingDetail — the stored booking, as recorded live. */
+export const tboBookingDetailSchema = z.object({
+  BookingStatus: z.string().optional(),
+  ConfirmationNumber: z.string().optional(),
+  VoucherStatus: z.boolean().optional(),
+  HotelDetails: z.object({ HotelCode: z.string().optional() }).optional(),
+  Rooms: z.array(tboBookedRoomSchema).optional(),
+});
+export type TboBookingDetail = z.infer<typeof tboBookingDetailSchema>;
+
+export const tboBookingDetailResponseSchema = z.object({
+  Status: tboStatusSchema,
+  BookingDetail: tboBookingDetailSchema.optional(),
+});
+export type TboBookingDetailResponse = z.infer<typeof tboBookingDetailResponseSchema>;
+
+/** POST /Cancel — envelope (+ any refund detail TBO includes). */
+export const tboCancelResponseSchema = z.object({
+  Status: tboStatusSchema,
+  ConfirmationNumber: z.string().optional(),
+});
+export type TboCancelResponse = z.infer<typeof tboCancelResponseSchema>;

@@ -150,7 +150,12 @@ export type SupplierBookingStatus = (typeof SUPPLIER_BOOKING_STATUSES)[number];
 
 export interface HotelBookingRecord {
   readonly supplierBookingReference: string;
-  /** Echoes HotelBookRequest.clientReference. */
+  /**
+   * Echoes HotelBookRequest.clientReference. May be "" on records built
+   * from a supplier retrieval surface that does not return it (e.g. TBO's
+   * BookingDetail) — the engine persists its own copy and never relies on
+   * the supplier echo outside book().
+   */
   readonly clientReference: string;
   readonly status: SupplierBookingStatus;
   readonly net: Money;

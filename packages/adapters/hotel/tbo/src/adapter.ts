@@ -8,14 +8,23 @@
  * no TBO shape crosses this boundary (CLAUDE.md rule 4).
  */
 
-import { SupplierError } from "@jenova/domain";
+import {
+  add,
+  resolvePenaltyAt,
+  SupplierError,
+  zero,
+  type CancellationPolicy,
+  type Money,
+} from "@jenova/domain";
 import {
   parseJsonWith,
   type AdapterCallContext,
+  type HotelBookRequest,
   type HotelBookingRecord,
   type HotelOffer,
   type HotelSearchQuery,
   type HotelSupplierAdapter,
+  type SupplierBookingStatus,
   type Transport,
   type TransportResponse,
 } from "@jenova/supplier-sdk";
@@ -26,8 +35,20 @@ import {
   TBO_STATUS_NO_ROOMS,
   TBO_STATUS_OK,
 } from "./errors";
-import { mapRoomToOffer, toTboHotelCode } from "./mapping";
-import { tboSearchResponseSchema } from "./schemas";
+import {
+  decodeOfferToken,
+  mapCancellationPolicy,
+  mapRoomToOffer,
+  tboAmountToMoney,
+  toTboHotelCode,
+} from "./mapping";
+import {
+  tboBookingDetailResponseSchema,
+  tboBookResponseSchema,
+  tboCancelResponseSchema,
+  tboSearchResponseSchema,
+  type TboStatus,
+} from "./schemas";
 
 export interface TboHotelAdapterOptions {
   /** The wired transport seam (createTboTransport: live, record or replay). */
@@ -106,20 +127,275 @@ class TboHotelAdapter implements HotelSupplierAdapter {
     return offers;
   }
 
-  check(): Promise<HotelOffer> {
-    return Promise.reject(new Error("TBO check mapping lands with M1.a3 (#56)"));
+  /**
+   * PreBook: revalidate the rate behind the offer token. Rejects with
+   * price_changed when the revalidated TotalFare or cancellation policy
+   * differs from what was priced at search; sold_out when the rate is gone.
+   */
+  async check(ctx: AdapterCallContext, supplierOfferToken: string): Promise<HotelOffer> {
+    const token = decodeOfferToken(supplierOfferToken);
+    const response = await this.client.call(ctx, "check", {
+      BookingCode: token.bookingCode,
+      PaymentMode: TBO_PAYMENT_MODE,
+    });
+    assertHttpOk(response, "check");
+    const body = parseJsonWith(tboSearchResponseSchema, response.body, {
+      supplierCode: TBO_SUPPLIER_CODE,
+    });
+    assertStatusOk(body.Status, "check");
+    const hotel = body.HotelResult?.[0];
+    const room = hotel?.Rooms[0];
+    if (hotel === undefined || room === undefined) {
+      throw new SupplierError(
+        "sold_out",
+        "TBO check: PreBook returned no rate for the offer",
+        { supplierCode: String(body.Status.Code), raw: body.Status },
+      );
+    }
+    const offer = mapRoomToOffer(room, hotel.HotelCode, hotel.Currency, ctx.nationality);
+    if (offer === undefined) {
+      throw new SupplierError(
+        "invalid_request",
+        `TBO check: unmappable meal type ${JSON.stringify(room.MealType)}`,
+      );
+    }
+    const priced = tboAmountToMoney(token.totalFare, token.currency);
+    if (!moneyEquals(offer.net, priced)) {
+      throw new SupplierError(
+        "price_changed",
+        `TBO check: price moved from ${priced.amount} ${priced.currency} to ${offer.net.amount} ${offer.net.currency}`,
+        { raw: { was: priced, now: offer.net } },
+      );
+    }
+    if (!policyEquals(offer.cancellationPolicy, token.policy)) {
+      throw new SupplierError(
+        "price_changed",
+        "TBO check: cancellation policy changed since the offer was priced",
+        { raw: { was: token.policy, now: offer.cancellationPolicy } },
+      );
+    }
+    return offer;
   }
 
-  book(): Promise<HotelBookingRecord> {
-    return Promise.reject(new Error("TBO book mapping lands with M1.a3 (#56)"));
+  /**
+   * Book: consumes a checked offer. clientReference is passed through as
+   * TBO's ClientReferenceId (and BookingReferenceId) so supplier-side
+   * idempotency holds — one clientReference, one booking. TBO echoes the
+   * ClientReferenceId in the Book response (verified on the recorded live
+   * booking).
+   */
+  async book(ctx: AdapterCallContext, request: HotelBookRequest): Promise<HotelBookingRecord> {
+    const token = decodeOfferToken(request.supplierOfferToken);
+    const response = await this.client.call(ctx, "book", {
+      BookingCode: token.bookingCode,
+      CustomerDetails: request.rooms.map((room) => ({
+        CustomerNames: room.guests.map((guest) => ({
+          // HotelGuest carries no honorific; TBO requires one. "Mr" is sent
+          // until the domain grows a title field (documented in README.md).
+          Title: "Mr",
+          FirstName: guest.firstName,
+          LastName: guest.lastName,
+          Type: guest.age !== undefined && guest.age < 18 ? "Child" : "Adult",
+        })),
+      })),
+      ClientReferenceId: request.clientReference,
+      BookingReferenceId: request.clientReference,
+      TotalFare: token.totalFare,
+      EmailId: request.holder.email,
+      PhoneNumber: request.holder.phone,
+      BookingType: TBO_BOOKING_TYPE,
+      PaymentMode: TBO_PAYMENT_MODE,
+    });
+    assertHttpOk(response, "book");
+    const body = parseJsonWith(tboBookResponseSchema, response.body, {
+      supplierCode: TBO_SUPPLIER_CODE,
+    });
+    assertStatusOk(body.Status, "book");
+    if (body.ConfirmationNumber === undefined || body.ConfirmationNumber === "") {
+      throw new SupplierError(
+        "supplier_rejected",
+        "TBO book: success status without a ConfirmationNumber",
+        { supplierCode: String(body.Status.Code), raw: body.Status },
+      );
+    }
+    return {
+      supplierBookingReference: body.ConfirmationNumber,
+      clientReference: body.ClientReferenceId ?? request.clientReference,
+      // TBO's voucher flow confirms synchronously on Status 200; the
+      // retrieved BookingStatus is the ground truth (mapBookingStatus).
+      status: "confirmed",
+      net: tboAmountToMoney(token.totalFare, token.currency),
+      cancellationPolicy: token.policy,
+    };
   }
 
-  retrieve(): Promise<HotelBookingRecord> {
-    return Promise.reject(new Error("TBO retrieve mapping lands with M1.a3 (#56)"));
+  /** BookingDetail by ConfirmationNumber. */
+  async retrieve(
+    ctx: AdapterCallContext,
+    supplierBookingReference: string,
+  ): Promise<HotelBookingRecord> {
+    const response = await this.client.call(ctx, "retrieve", {
+      ConfirmationNumber: supplierBookingReference,
+      PaymentMode: TBO_PAYMENT_MODE,
+    });
+    assertHttpOk(response, "retrieve");
+    const body = parseJsonWith(tboBookingDetailResponseSchema, response.body, {
+      supplierCode: TBO_SUPPLIER_CODE,
+    });
+    assertStatusOk(body.Status, "retrieve");
+    const detail = body.BookingDetail;
+    const rooms = detail?.Rooms ?? [];
+    const first = rooms[0];
+    if (detail === undefined || first === undefined) {
+      throw new SupplierError(
+        "supplier_rejected",
+        "TBO retrieve: success status without booked rooms",
+        { supplierCode: String(body.Status.Code), raw: body.Status },
+      );
+    }
+    // Fare and cancellation policies are PER ROOM on BookingDetail (recorded
+    // live); the canonical record aggregates them: net = sum of room fares,
+    // policy = per-instant sum of each room's penalty in force.
+    for (const room of rooms) {
+      if (room.Currency !== first.Currency) {
+        throw new SupplierError(
+          "invalid_request",
+          `TBO retrieve: mixed room currencies ${first.Currency}/${room.Currency}`,
+        );
+      }
+    }
+    const net = rooms
+      .map((room) => tboAmountToMoney(room.TotalFare, room.Currency))
+      .reduce(addMoney);
+    const roomPolicies = rooms.map((room) =>
+      mapCancellationPolicy(
+        room.CancelPolicies,
+        tboAmountToMoney(room.TotalFare, room.Currency),
+        room.IsRefundable ?? false,
+      ),
+    );
+    return {
+      supplierBookingReference: detail.ConfirmationNumber ?? supplierBookingReference,
+      // TBO's BookingDetail does not echo ClientReferenceId (only the Book
+      // response does — verified live); the engine keeps its own copy.
+      clientReference: "",
+      status: mapBookingStatus(detail.BookingStatus),
+      net,
+      cancellationPolicy: mergeCancellationPolicies(roomPolicies),
+    };
   }
 
-  cancel(): Promise<HotelBookingRecord> {
-    return Promise.reject(new Error("TBO cancel mapping lands with M1.a3 (#56)"));
+  /**
+   * Cancel by ConfirmationNumber, then re-read BookingDetail so the record
+   * reflects the supplier's stored state (status, and the penalty the
+   * policy's rules resolve at cancellation time).
+   */
+  async cancel(
+    ctx: AdapterCallContext,
+    supplierBookingReference: string,
+  ): Promise<HotelBookingRecord> {
+    const response = await this.client.call(ctx, "cancel", {
+      ConfirmationNumber: supplierBookingReference,
+    });
+    assertHttpOk(response, "cancel");
+    const body = parseJsonWith(tboCancelResponseSchema, response.body, {
+      supplierCode: TBO_SUPPLIER_CODE,
+    });
+    assertStatusOk(body.Status, "cancel");
+    return this.retrieve(ctx, supplierBookingReference);
+  }
+}
+
+const TBO_PAYMENT_MODE = "Limit";
+const TBO_BOOKING_TYPE = "Voucher";
+
+function assertStatusOk(status: TboStatus, operation: string): void {
+  if (status.Code !== TBO_STATUS_OK) {
+    throw supplierErrorFromStatus(status, operation);
+  }
+}
+
+function moneyEquals(a: Money, b: Money): boolean {
+  return a.amount === b.amount && a.currency === b.currency;
+}
+
+function addMoney(a: Money, b: Money): Money {
+  return add(a, b);
+}
+
+/**
+ * Aggregate per-room policies into one booking-level policy: at every
+ * deadline any room introduces, the penalty is the sum of each room's
+ * penalty then in force. Refundable only when every room is.
+ */
+function mergeCancellationPolicies(
+  policies: readonly CancellationPolicy[],
+): CancellationPolicy {
+  const single = policies[0];
+  if (policies.length === 1 && single !== undefined) {
+    return single;
+  }
+  const currency =
+    policies.flatMap((policy) => policy.rules.map((rule) => rule.penalty.currency))[0] ?? "USD";
+  const instants = [
+    ...new Set(policies.flatMap((policy) => policy.rules.map((rule) => rule.fromUtc))),
+  ].sort((a, b) => Date.parse(a) - Date.parse(b));
+  return {
+    refundable: policies.every((policy) => policy.refundable),
+    rules: instants.map((fromUtc) => ({
+      fromUtc,
+      penalty: policies
+        .map((policy) => resolvePenaltyAt(policy, new Date(fromUtc)) ?? zero(currency))
+        .reduce(addMoney, zero(currency)),
+    })),
+  };
+}
+
+function policyEquals(a: CancellationPolicy, b: CancellationPolicy): boolean {
+  return (
+    a.refundable === b.refundable &&
+    a.rules.length === b.rules.length &&
+    a.rules.every((rule, i) => {
+      const other = b.rules[i];
+      return (
+        other !== undefined &&
+        rule.fromUtc === other.fromUtc &&
+        moneyEquals(rule.penalty, other.penalty)
+      );
+    })
+  );
+}
+
+/**
+ * TBO BookingStatus → supplier-side status. Values observed live are listed
+ * first; TBO's documented pending/async vocabulary maps to "pending" so the
+ * engine's pending_confirmation polling owns them. Unknown vocabulary fails
+ * loudly (drift detection) rather than guessing a state.
+ */
+function mapBookingStatus(value: string | undefined): SupplierBookingStatus {
+  const status = (value ?? "").trim().toLowerCase();
+  switch (status) {
+    case "confirmed":
+    case "vouchered":
+      return "confirmed";
+    case "cancelled":
+    case "canceled":
+      return "cancelled";
+    // CancellationInProgress observed live: Cancel is asynchronous —
+    // BookingDetail reports it until the cancellation settles to Cancelled.
+    case "pending":
+    case "inprogress":
+    case "in progress":
+    case "onrequest":
+    case "on request":
+    case "unconfirmed":
+    case "cancellationinprogress":
+      return "pending";
+    default:
+      throw new SupplierError(
+        "invalid_request",
+        `TBO retrieve: unknown BookingStatus ${JSON.stringify(value)}`,
+      );
   }
 }
 

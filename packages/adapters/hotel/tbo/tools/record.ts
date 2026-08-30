@@ -11,7 +11,11 @@
  */
 
 import { createTboHotelAdapter, TboClient, createTboTransport, type TboEndpoint } from "../src/index";
-import { RECORDED_SEARCH_QUERY } from "../src/recorded-scenarios";
+import {
+  makeRecordedBookRequest,
+  pickLifecycleOffer,
+  RECORDED_SEARCH_QUERY,
+} from "../src/recorded-scenarios";
 import { loadRepoEnv, recordingContext, type RecordingContextOverrides } from "./env";
 
 loadRepoEnv();
@@ -57,6 +61,58 @@ async function main(): Promise<void> {
       }
       return;
     }
+    case "lifecycle": {
+      // The full recorded proof: search -> check -> book -> retrieve ->
+      // cancel ONE real sandbox reservation (cheapest refundable rate with
+      // free cancellation, cancelled immediately). Every hop is recorded.
+      const adapter = createTboHotelAdapter({ transport: createTboTransport({ mode: "record" }) });
+      const ctx = () => recordingContext();
+      const offers = await adapter.search(ctx(), RECORDED_SEARCH_QUERY);
+      console.log(`search -> ${offers.length} offers`);
+      const offer = pickLifecycleOffer(offers);
+      console.log(
+        `picked ${offer.canonicalPropertyId} "${offer.supplierRoomName}" ${offer.net.amount} ${offer.net.currency}`,
+      );
+      const checked = await adapter.check(ctx(), offer.supplierOfferToken);
+      console.log(`check -> ok, net ${checked.net.amount} ${checked.net.currency}`);
+      const booked = await adapter.book(ctx(), makeRecordedBookRequest(checked));
+      console.log(
+        `book -> ${booked.status}, ref ${booked.supplierBookingReference}, clientReference ${booked.clientReference}`,
+      );
+      const retrieved = await adapter.retrieve(ctx(), booked.supplierBookingReference);
+      console.log(`retrieve -> ${retrieved.status}, clientReference ${retrieved.clientReference}`);
+      const cancelled = await adapter.cancel(ctx(), booked.supplierBookingReference);
+      console.log(`cancel -> ${cancelled.status}`);
+      return;
+    }
+    case "resume": {
+      // Finish an interrupted lifecycle session: retrieve + cancel the given
+      // live sandbox reservation through the adapter, recording both hops.
+      const adapter = createTboHotelAdapter({ transport: createTboTransport({ mode: "record" }) });
+      const reference = args[0];
+      if (reference === undefined) throw new Error("usage: record resume <confirmationNumber>");
+      const retrieved = await adapter.retrieve(recordingContext(), reference);
+      console.log(`retrieve -> ${retrieved.status}, net ${retrieved.net.amount} ${retrieved.net.currency}`);
+      const cancelled = await adapter.cancel(recordingContext(), reference);
+      console.log(`cancel -> ${cancelled.status}`);
+      return;
+    }
+    case "retrieveBooking": {
+      const adapter = createTboHotelAdapter({ transport: createTboTransport({ mode: "record" }) });
+      const reference = args[0];
+      if (reference === undefined) throw new Error("usage: record retrieveBooking <confirmationNumber>");
+      const retrieved = await adapter.retrieve(recordingContext(), reference);
+      console.log(
+        `retrieve -> ${retrieved.status}, net ${retrieved.net.amount} ${retrieved.net.currency}, refundable=${retrieved.cancellationPolicy.refundable}`,
+      );
+      return;
+    }
+    case "prebook":
+      // Exact payload shape the adapter's check() sends — the recording it
+      // produces is replayable by the adapter tests.
+      return call("check", { BookingCode: args[0], PaymentMode: "Limit" });
+    case "bookingDetail":
+      return call("retrieve", { ConfirmationNumber: args[0], PaymentMode: "Limit" });
     default:
       throw new Error(`unknown scenario: ${String(scenario)}`);
   }

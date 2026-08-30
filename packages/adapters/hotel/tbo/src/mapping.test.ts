@@ -137,6 +137,10 @@ describe("offer token", () => {
     roomName: "Studio,2 Twin Beds",
     boardBasis: "RO",
     refundable: true,
+    policy: {
+      refundable: true,
+      rules: [{ fromUtc: "2026-08-28T18:30:00.000Z", penalty: money(0, "USD") }],
+    },
     nationality: "SA",
   };
 

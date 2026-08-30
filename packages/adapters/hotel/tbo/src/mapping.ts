@@ -204,6 +204,8 @@ export interface TboOfferTokenV1 {
   readonly roomName: string;
   readonly boardBasis: BoardBasis;
   readonly refundable: boolean;
+  /** Normalized policy as priced — check() compares it to detect changes. */
+  readonly policy: CancellationPolicy;
   readonly nationality: string;
 }
 
@@ -259,6 +261,7 @@ export function mapRoomToOffer(
   }
   const net = tboAmountToMoney(room.TotalFare, currency);
   const roomName = room.Name[0] ?? "";
+  const cancellationPolicy = mapCancellationPolicy(room.CancelPolicies, net, room.IsRefundable);
   return {
     supplierOfferToken: encodeOfferToken({
       v: 1,
@@ -269,13 +272,14 @@ export function mapRoomToOffer(
       roomName,
       boardBasis,
       refundable: room.IsRefundable,
+      policy: cancellationPolicy,
       nationality,
     }),
     canonicalPropertyId: toCanonicalPropertyId(hotelCode),
     supplierRoomName: roomName,
     boardBasis,
     net,
-    cancellationPolicy: mapCancellationPolicy(room.CancelPolicies, net, room.IsRefundable),
+    cancellationPolicy,
     nationalityApplied: nationality,
   };
 }
