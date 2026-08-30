@@ -4,7 +4,7 @@
 test it, and ship a reviewed PR to staging — unaided.
 
 ## Deliverables
-- [ ] Monorepo: pnpm workspaces + Turborepo; TS strict base config; ESLint with the
+- [x] Monorepo: pnpm workspaces + Turborepo; TS strict base config; ESLint with the
       module-boundary rule (apps can't import apps; only the supplier registry imports
       adapters; adapters can't import engine modules).
 - [ ] `CLAUDE.md` (root) — the agent conventions, final version.
@@ -26,9 +26,10 @@ test it, and ship a reviewed PR to staging — unaided.
       (host→tenant resolution, auth realm stub, entitlement check stub), health/ready.
 - [ ] Auth skeleton: session issuance/verification per realm, TOTP enrollment (full
       flows land with their apps).
-- [ ] Local dev: Docker Compose (Postgres, Redis, MinIO, mailpit); `.env.example` with
+- [x] Local dev: Docker Compose (Postgres, Redis, MinIO, mailpit); `.env.example` with
       supplier-credential placeholders keyed to Tarek's list.
-- [ ] CI: lint, typecheck, tests, migration fan-out dry-run on synthetic tenant DBs.
+- [x] CI: lint, typecheck, tests, migration fan-out dry-run on synthetic tenant DBs
+      (dry-run step is a placeholder echo until `@jenova/db` lands — issue #3).
 - [ ] Staging: Terraform for one VM + managed Postgres in me-south-1; deploy on main.
 
 ## Agent workstreams (parallel)
