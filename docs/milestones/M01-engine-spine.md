@@ -28,13 +28,24 @@ recorded traffic powering CI. No UI yet beyond API endpoints.
       breakdown correctness, FX with stored rate + buffer).
 - [x] **Offer store**: TTL cache + signed price hash; `check` revalidation flow with
       price-delta surfacing.
-- [ ] **Booking engine** (`api/hotel-booking`): BookingItem state machine runner —
+- [x] **Booking engine** (`api/hotel-booking`): BookingItem state machine runner —
       atomic transition = validate legality + persist + ledger postings + AuditEvent +
       event emission; idempotent booking via client reference; `pending_confirmation`
       handling via worker polling.
-- [ ] **Ledger core** (`api/ledger`): double-entry postings for reserve/confirm/cancel;
+      (#66/#67: runner + book/cancel service live in `@jenova/booking-engine` +
+      `api/hotel-booking` — the runner is a shared package because the worker
+      transitions through it too; outbox-light `booking_event` table for
+      post-commit event dispatch.)
+- [x] **Ledger core** (`api/ledger`): double-entry postings for reserve/confirm/cancel;
       balance reads; the ledger-invariant checker (debits=credits) wired into tests.
-- [ ] Worker app: BullMQ queues for supplier retries + pending-confirmation polling.
+      (#69: posting templates as data in `@jenova/booking-engine`; reserve =
+      hold memo (credit-engine postings land M3); invariant sweep asserted in
+      service tests and in the CI Postgres job.)
+- [x] Worker app: BullMQ queues for supplier retries + pending-confirmation polling.
+      (#68: BullMQ job-scheduler sweep — pending_confirmation and async-cancel
+      waits, exponential backoff, max-age escalation to the manual queue;
+      supplier retries stay in the transport client, bounded and
+      idempotent-only.)
 - [x] Contract-test suite v1 in supplier-sdk: the generic suite every hotel adapter must
       pass — runs on recordings in CI, and live pre-certification. (Proven both modes
       on the TBO adapter; run report: `docs/certification/tbo.md`.)

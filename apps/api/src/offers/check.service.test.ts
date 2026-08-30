@@ -20,7 +20,7 @@ import { assemblePricedOffer } from "../pricing/offer";
 import { InMemoryMarkupRuleSource, PricingService } from "../pricing/pricing.service";
 import { resolvePrice } from "../pricing/resolve";
 import type { PricingContext } from "../pricing/rules";
-import { StaticSupplierRegistry, type SupplierCredentialsSource } from "../supplier-registry";
+import { StaticSupplierRegistry, type SupplierCredentialsSource } from "@jenova/supplier-registry";
 import { OfferCheckService } from "./check.service";
 import { SupplierUnavailableError } from "./errors";
 import { InMemoryOfferStore } from "./offer-store";

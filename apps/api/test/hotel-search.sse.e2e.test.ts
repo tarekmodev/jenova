@@ -31,7 +31,7 @@ import {
   SUPPLIER_CREDENTIALS_SOURCE,
   SUPPLIER_REGISTRY,
   type SupplierCredentialsSource,
-} from "../src/supplier-registry";
+} from "@jenova/supplier-registry";
 
 // Structural config — mirrors .env.example's local defaults (chain shape only).
 const testConfig: ApiConfig = Object.freeze({

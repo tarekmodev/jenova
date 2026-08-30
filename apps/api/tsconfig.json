@@ -4,5 +4,5 @@
     "experimentalDecorators": true,
     "types": ["node"]
   },
-  "include": ["src", "test", "vitest.config.ts"]
+  "include": ["src", "test", "tools", "vitest.config.ts"]
 }

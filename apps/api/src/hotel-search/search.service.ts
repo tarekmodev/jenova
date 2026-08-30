@@ -40,7 +40,7 @@ import { assemblePricedOffer } from "../pricing/offer";
 import type { PricingService } from "../pricing/pricing.service";
 import type { PricingContext } from "../pricing/rules";
 import type { OffersService } from "../offers/offers.service";
-import type { SupplierCredentialsSource, SupplierRegistry } from "../supplier-registry";
+import type { SupplierCredentialsSource, SupplierRegistry } from "@jenova/supplier-registry";
 import type { AvailabilityCache } from "./availability-cache";
 import type { SupplierAccountsSource } from "./supplier-accounts";
 

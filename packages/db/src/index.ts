@@ -47,6 +47,7 @@ export {
   offers,
   bookings,
   bookingItems,
+  bookingEvents,
   ledgerAccounts,
   journalEntries,
   auditEvents,

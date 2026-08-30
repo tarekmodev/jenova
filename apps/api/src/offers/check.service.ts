@@ -33,7 +33,7 @@ import type {
 import { assemblePricedOffer } from "../pricing/offer";
 import type { PricingService } from "../pricing/pricing.service";
 import type { SettlementSpec } from "../pricing/resolve";
-import type { SupplierCredentialsSource, SupplierRegistry } from "../supplier-registry";
+import type { SupplierCredentialsSource, SupplierRegistry } from "@jenova/supplier-registry";
 import { OfferError, SupplierUnavailableError } from "./errors";
 import type { OffersService, VerifiedOffer } from "./offers.service";
 

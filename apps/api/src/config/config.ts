@@ -9,12 +9,17 @@
  */
 
 import { z } from "zod";
+import { NODE_ENVS, type NodeEnv } from "@jenova/supplier-registry";
 
-export const NODE_ENVS = ["development", "test", "production"] as const;
-export type NodeEnv = (typeof NODE_ENVS)[number];
+// Single-source NodeEnv vocabulary (supplier-registry gates transport mode
+// AND the credentials seam on it); re-exported for existing importers.
+export { NODE_ENVS, type NodeEnv };
 
 const apiEnvSchema = z.object({
-  NODE_ENV: z.enum(NODE_ENVS).default("development"),
+  // FAIL-CLOSED (review round 2): an unset NODE_ENV is PRODUCTION — live
+  // transport, no recordings, no env credentials. Development must be asked
+  // for by name (.env.example sets it; main.ts loads .env in local dev).
+  NODE_ENV: z.enum(NODE_ENVS).default("production"),
   API_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   // Required from day one: the gateway's tenant directory and rate limiting
   // are control-plane/redis reads as soon as #42 wiring lands, and requiring

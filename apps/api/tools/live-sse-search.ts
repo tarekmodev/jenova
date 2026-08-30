@@ -43,7 +43,7 @@ import {
   SUPPLIER_CREDENTIALS_SOURCE,
   SUPPLIER_REGISTRY,
   type SupplierCredentialsSource,
-} from "../src/supplier-registry";
+} from "@jenova/supplier-registry";
 
 const REPO_ROOT_ENV = resolve(import.meta.dirname, "../../../.env");
 if (existsSync(REPO_ROOT_ENV)) {

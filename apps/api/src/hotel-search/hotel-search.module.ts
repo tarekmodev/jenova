@@ -20,7 +20,7 @@ import {
   SUPPLIER_REGISTRY,
   type SupplierCredentialsSource,
   type SupplierRegistry,
-} from "../supplier-registry";
+} from "@jenova/supplier-registry";
 import { TENANT_DB_RESOLVER, TenantDbModule } from "../tenancy/tenant-db.module";
 import {
   AVAILABILITY_CACHE,

@@ -37,10 +37,10 @@ export default tseslint.config(
           alwaysTryTypes: true,
         },
       },
-      // Order matters: first match wins, so carve supplier-registry out of apps/api
-      // and adapters/ui out of packages/* before the generic patterns.
+      // Order matters: first match wins, so carve supplier-registry, adapters
+      // and ui out of packages/* before the generic patterns.
       "boundaries/elements": [
-        { type: "supplier-registry", pattern: "apps/api/src/supplier-registry" },
+        { type: "supplier-registry", pattern: "packages/supplier-registry" },
         {
           type: "adapter",
           pattern: "packages/adapters/*/*",
@@ -91,16 +91,16 @@ export default tseslint.config(
               allow: { to: { element: { type: "ui" } } },
             },
             {
-              from: { element: { type: "app", captured: { app: "api" } } },
+              // Only the two ENGINE processes consume the supplier registry;
+              // frontends and other packages never reach adapters, even
+              // transitively through it.
+              from: { element: { type: "app", captured: { app: "(api|worker)" } } },
               allow: { to: { element: { type: "supplier-registry" } } },
             },
             {
               // The supplier registry is the ONLY place adapter packages may be imported.
               from: { element: { type: "supplier-registry" } },
-              allow: [
-                { to: { element: { types: { anyOf: ["adapter", "package"] } } } },
-                { to: { element: { type: "app", captured: { app: "api" } } } },
-              ],
+              allow: [{ to: { element: { types: { anyOf: ["adapter", "package"] } } } }],
             },
             {
               // Adapters translate to canonical domain types; they may not reach

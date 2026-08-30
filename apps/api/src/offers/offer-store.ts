@@ -79,6 +79,14 @@ export interface OfferStore {
   /** Withdraws the offer permanently (sold_out / superseded); idempotent. */
   invalidate(tenant: TenantId, offerId: string, at: Date): Promise<void>;
   /**
+   * Atomically CLAIMS the offer for booking: the conditional invalidation
+   * must actually flip the row. False when the offer was already consumed,
+   * superseded or withdrawn — under two racing book calls on one offer,
+   * exactly one claim wins and only the winner may call the supplier
+   * (review M1: the post-book invalidate left a double-book window open).
+   */
+  claim(tenant: TenantId, offerId: string, at: Date): Promise<boolean>;
+  /**
    * Atomically claims `oldOfferId` (its invalidation must actually flip the
    * row) and inserts its successor in the same transaction. Returns false —
    * inserting NOTHING — when the old offer was already invalidated, e.g. by
@@ -180,6 +188,16 @@ export class DrizzleOfferStore implements OfferStore {
       .where(and(eq(offers.id, offerId), isNull(offers.invalidatedAt)));
   }
 
+  async claim(tenant: TenantId, offerId: string, at: Date): Promise<boolean> {
+    const db = await this.resolver.getTenantDb(tenant);
+    const claimed = await db
+      .update(offers)
+      .set({ invalidatedAt: at })
+      .where(and(eq(offers.id, offerId), isNull(offers.invalidatedAt)))
+      .returning({ id: offers.id });
+    return claimed.length === 1;
+  }
+
   async supersede(
     tenant: TenantId,
     oldOfferId: string,
@@ -257,6 +275,15 @@ export class InMemoryOfferStore implements OfferStore {
       map.set(offerId, { ...row, invalidatedAt: at });
     }
     return Promise.resolve();
+  }
+
+  claim(tenant: TenantId, offerId: string, at: Date): Promise<boolean> {
+    const row = this.tenantMap(tenant).get(offerId);
+    if (row === undefined || row.invalidatedAt !== null) {
+      return Promise.resolve(false);
+    }
+    this.tenantMap(tenant).set(offerId, { ...row, invalidatedAt: at });
+    return Promise.resolve(true);
   }
 
   async supersede(

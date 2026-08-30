@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { InMemoryOfferStore } from "../offers/offer-store";
 import { FixedOfferTtlSource, OffersService } from "../offers/offers.service";
 import { InMemoryMarkupRuleSource, PricingService } from "../pricing/pricing.service";
-import { StaticSupplierRegistry, type SupplierCredentialsSource } from "../supplier-registry";
+import { StaticSupplierRegistry, type SupplierCredentialsSource } from "@jenova/supplier-registry";
 import { AvailabilityCache, FixedSearchCacheTtlSource } from "./availability-cache";
 import { InMemorySearchCache } from "./cache";
 import { HotelSearchService, type HotelSearchEvent, type HotelSearchRequest } from "./search.service";

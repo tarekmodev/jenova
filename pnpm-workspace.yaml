@@ -13,6 +13,9 @@ allowBuilds:
   # esbuild ships the platform binary as an optional dependency; its install
   # script only verifies it (needed by tsx, which runs the migration CLIs).
   esbuild: true
+  # bullmq → msgpackr → optional native accelerator; msgpackr runs pure-JS
+  # without it — never build native code for it.
+  msgpackr-extract: false
   unrs-resolver: true
 
 catalog:

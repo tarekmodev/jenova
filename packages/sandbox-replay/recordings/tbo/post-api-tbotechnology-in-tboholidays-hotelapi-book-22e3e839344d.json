@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "supplier": "tbo",
+  "fingerprint": "post-api-tbotechnology-in-tboholidays-hotelapi-book-22e3e839344d",
+  "request": {
+    "method": "POST",
+    "url": "https://api.tbotechnology.in/TBOHolidays_HotelAPI/Book",
+    "headers": {
+      "accept": "application/json",
+      "authorization": "[REDACTED]",
+      "content-type": "application/json"
+    },
+    "body": "{\"BookingCode\":\"1065918!TB!1!TB!38db57a6-a4af-11f1-9add-6a73999387c6!TB!N!TB!AFF!\",\"CustomerDetails\":[{\"CustomerNames\":[{\"Title\":\"Mr\",\"FirstName\":\"Jenova\",\"LastName\":\"Certification\",\"Type\":\"Adult\"}]}],\"ClientReferenceId\":\"JENOVA-M1-BOOKENG-0001\",\"BookingReferenceId\":\"JENOVA-M1-BOOKENG-0001\",\"TotalFare\":141.69,\"EmailId\":\"jenova.certification@example.com\",\"PhoneNumber\":\"966555000000\",\"BookingType\":\"Voucher\",\"PaymentMode\":\"Limit\"}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "cache-control": "no-cache",
+      "connection": "keep-alive",
+      "content-length": "125",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Sun, 30 Aug 2026 20:13:25 GMT",
+      "expires": "-1",
+      "pragma": "no-cache",
+      "server": "WebServer",
+      "strict-transport-security": "max-age=31536000; includeSubDomains; preload"
+    },
+    "body": "{\"Status\":{\"Code\":200,\"Description\":\"Successful\"},\"ClientReferenceId\":\"JENOVA-M1-BOOKENG-0001\",\"ConfirmationNumber\":\"PCUGMH\"}"
+  },
+  "timings": {
+    "durationMs": 11428
+  }
+}

@@ -15,12 +15,13 @@ import { PRICING_SERVICE, type PricingService } from "../pricing/pricing.service
 import { PricingModule } from "../pricing/pricing.module";
 import {
   createSupplierRegistry,
+  EnvSupplierCredentialsSource,
   SUPPLIER_CREDENTIALS_SOURCE,
   SUPPLIER_REGISTRY,
   UnboundSupplierCredentialsSource,
   type SupplierCredentialsSource,
   type SupplierRegistry,
-} from "../supplier-registry";
+} from "@jenova/supplier-registry";
 import { TENANT_DB_RESOLVER, TenantDbModule } from "../tenancy/tenant-db.module";
 import { OFFER_CHECK_SERVICE, OfferCheckService } from "./check.service";
 import { DrizzleOfferStore, OFFER_STORE, type OfferStore } from "./offer-store";
@@ -62,10 +63,16 @@ import {
       useFactory: () => createSupplierRegistry(),
     },
     {
-      // supplier_account decryption binds here with the adapter workstream's
-      // secret-store wiring; until then credential lookups fail loudly.
+      // supplier_account decryption binds here when the secret-store wiring
+      // lands. Until then: development uses the repo .env sandbox credentials
+      // (real credentials, the tenant's own sandbox account — never fakes);
+      // every other environment fails loudly.
       provide: SUPPLIER_CREDENTIALS_SOURCE,
-      useClass: UnboundSupplierCredentialsSource,
+      inject: [API_CONFIG],
+      useFactory: (config: ApiConfig): SupplierCredentialsSource =>
+        config.nodeEnv === "development"
+          ? new EnvSupplierCredentialsSource()
+          : new UnboundSupplierCredentialsSource(),
     },
     {
       provide: OFFER_CHECK_SERVICE,

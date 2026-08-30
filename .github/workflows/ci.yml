@@ -92,3 +92,20 @@ jobs:
         env:
           JENOVA_TEST_PG_URL: postgres://jenova:jenova@localhost:5432/jenova
           JENOVA_REQUIRE_PG: "1"
+
+      # Booking engine money path (issues #66/#69): atomic transitions,
+      # balanced postings, and the ledger-invariant sweep over everything the
+      # run posted (the nightly-style debits===credits assertion).
+      - name: booking-engine service tests (against the CI Postgres)
+        run: pnpm --filter @jenova/booking-engine test
+        env:
+          JENOVA_TEST_PG_URL: postgres://jenova:jenova@localhost:5432/jenova
+          JENOVA_REQUIRE_PG: "1"
+
+      # Worker pending-confirmation polling (issue #68) over recorded
+      # supplier traffic — never live suppliers in CI.
+      - name: worker service tests (against the CI Postgres)
+        run: pnpm --filter @jenova/worker test
+        env:
+          JENOVA_TEST_PG_URL: postgres://jenova:jenova@localhost:5432/jenova
+          JENOVA_REQUIRE_PG: "1"

@@ -211,8 +211,44 @@ export const bookingItems = pgTable(
     policySnapshot: jsonb("policy_snapshot").$type<CancellationPolicy>().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    // 0004 booking-engine columns (expand-only; see the migration for the
+    // full semantics): pending wait start, async-cancel marker, worker poll
+    // bookkeeping, and the manual-intervention escalation flag.
+    pendingSince: timestamp("pending_since", { withTimezone: true, mode: "date" }),
+    cancellationRequestedAt: timestamp("cancellation_requested_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    pollAttempts: integer("poll_attempts").notNull().default(0),
+    nextPollAt: timestamp("next_poll_at", { withTimezone: true, mode: "date" }),
+    escalatedAt: timestamp("escalated_at", { withTimezone: true, mode: "date" }),
+    escalationReason: text("escalation_reason"),
   },
   (t) => [index("booking_item_booking_ix").on(t.bookingId)],
+);
+
+/**
+ * Outbox-light domain events (0004): transitions INSERT events in the same
+ * transaction that moves state and posts the ledger; the post-commit
+ * dispatcher publishes and stamps `publishedAt`. Unpublished rows survive a
+ * crash and are re-dispatched by the worker sweep.
+ */
+export const bookingEvents = pgTable(
+  "booking_event",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => bookings.id, { onDelete: "cascade" }),
+    bookingItemId: uuid("booking_item_id").references(() => bookingItems.id, {
+      onDelete: "cascade",
+    }),
+    eventType: text("event_type").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
+  },
+  (t) => [index("booking_event_booking_ix").on(t.bookingId)],
 );
 
 /** Chart of accounts, per tenant (agency receivables, supplier payables, sales, VAT, ...). */
