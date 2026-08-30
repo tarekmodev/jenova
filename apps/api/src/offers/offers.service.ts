@@ -313,6 +313,17 @@ export class OffersService {
   }
 
   /**
+   * Atomically claims an offer for booking — ONE book attempt per offer,
+   * enforced at the row (conditional invalidation, rowcount-gated): under
+   * two racing book calls exactly one claim wins, so only one supplier
+   * book() can ever be sent for one offer. False = already consumed,
+   * superseded or withdrawn.
+   */
+  async claimOfferForBooking(tenant: TenantId, offerId: string): Promise<boolean> {
+    return this.store.claim(tenant, offerId, this.now());
+  }
+
+  /**
    * Atomically replaces `oldOfferId` with a re-priced successor. False when
    * a concurrently racing check claimed the old offer first — the successor
    * is then NOT persisted (one offer, at most one bookable successor).

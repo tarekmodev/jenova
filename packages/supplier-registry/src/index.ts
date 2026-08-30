@@ -162,6 +162,14 @@ export class EnvSupplierCredentialsSource implements SupplierCredentialsSource {
   constructor(private readonly env: Readonly<Record<string, string | undefined>> = process.env) {}
 
   credentialsFor(tenant: TenantId, supplierCode: string): Promise<SupplierAccountCredentials> {
+    if (this.env["NODE_ENV"] === "production") {
+      // Belt AND braces with the wiring (which binds Unbound outside
+      // development): env credentials must be structurally unusable in
+      // production even if mis-wired (review M1).
+      return Promise.reject(
+        new Error("EnvSupplierCredentialsSource is a development-only seam — refused in production"),
+      );
+    }
     if (supplierCode !== TBO_SUPPLIER_CODE) {
       return Promise.reject(
         new Error(`no development credentials mapping for supplier ${supplierCode}`),

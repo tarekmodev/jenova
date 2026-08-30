@@ -234,10 +234,10 @@ async function main(): Promise<void> {
     const poller = new PendingConfirmationPoller(
       resolver,
       runner,
-      async (t, supplierCode, ref) => {
-        const adapter = liveRegistry.hotelAdapter(supplierCode);
-        if (adapter === null) throw new Error(`no adapter for ${supplierCode}`);
-        return adapter.retrieve(await adapterCtx(), ref);
+      async (_tenant, target) => {
+        const adapter = liveRegistry.hotelAdapter(target.supplierCode);
+        if (adapter === null) throw new Error(`no adapter for ${target.supplierCode}`);
+        return adapter.retrieve(await adapterCtx(), target.supplierBookingReference);
       },
       { baseMs: 30_000, factor: 2, capMs: 600_000, maxPendingAgeMs: 3_600_000 },
     );

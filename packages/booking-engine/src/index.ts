@@ -62,6 +62,7 @@ export {
 export {
   BookingTransitionRunner,
   loadBookingWithItems,
+  moneyAmountFrom,
   type AuditActor,
   type BookingItemRow,
   type BookingRow,

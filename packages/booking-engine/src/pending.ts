@@ -24,6 +24,7 @@ import type { Money, TenantId } from "@jenova/domain";
 import { resolvePenaltyAt, SupplierError, zero } from "@jenova/domain";
 import { bookingItems, type TenantDbResolver } from "@jenova/db";
 import type { HotelBookingRecord } from "@jenova/supplier-sdk";
+import { TransitionConflictError } from "./errors";
 import type { AuditActor, BookingItemRow, BookingTransitionRunner } from "./runner";
 
 export interface PendingBackoffPolicy {
@@ -48,14 +49,21 @@ export function backoffDelayMs(policy: PendingBackoffPolicy, attempts: number): 
   return Math.min(policy.capMs, Math.round(policy.baseMs * policy.factor ** Math.max(0, attempts)));
 }
 
+/** What a retrieve hop needs to know about the item being polled. */
+export interface PendingRetrieveTarget {
+  readonly supplierCode: string;
+  readonly supplierBookingReference: string;
+  /** The item's own currency — the retrieve context echoes it, never a constant. */
+  readonly currency: string;
+}
+
 /** How the WORKER reaches the supplier: composed from registry + credentials. */
 export type RetrieveBookingFn = (
   tenant: TenantId,
-  supplierCode: string,
-  supplierBookingReference: string,
+  target: PendingRetrieveTarget,
 ) => Promise<HotelBookingRecord>;
 
-export type PendingWaitKind = "confirmation" | "cancellation";
+export type PendingWaitKind = "confirmation" | "cancellation" | "reservation";
 
 export interface PendingItemOutcome {
   readonly bookingItemId: string;
@@ -66,7 +74,11 @@ export interface PendingItemOutcome {
     | "transitioned_failed"
     | "still_pending"
     | "escalated"
-    | "retrieve_failed";
+    | "retrieve_failed"
+    /** A concurrent transition won the race — benign, next sweep re-reads. */
+    | "conflict_skipped"
+    /** Unexpected failure processing this ONE item; the sweep continues. */
+    | "error";
   readonly detail?: string;
 }
 
@@ -78,6 +90,7 @@ export interface PollReport {
 const WORKER_ACTOR: AuditActor = { actorType: "system", actorId: "worker:pending-confirmation" };
 
 function waitKindOf(item: BookingItemRow): PendingWaitKind {
+  if (item.state === "reserved") return "reservation";
   return item.state === "pending_confirmation" ? "confirmation" : "cancellation";
 }
 
@@ -103,33 +116,66 @@ export class PendingConfirmationPoller {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  /** Items whose wait is due for a poll (never escalated ones). */
+  /**
+   * Items whose wait is due for a poll (never escalated ones), plus
+   * RESERVED items older than the max pending age: an item stranded in
+   * `reserved` (crash between reserve and the supplier's book answer)
+   * must surface in the manual queue, not sit invisible forever
+   * (review M1).
+   */
   async duePendingItems(tenant: TenantId, limit = 50): Promise<readonly BookingItemRow[]> {
     const db = await this.resolver.getTenantDb(tenant);
     const now = this.now();
+    const reservedStuckBefore = new Date(now.getTime() - this.policy.maxPendingAgeMs);
     return db
       .select()
       .from(bookingItems)
       .where(
         and(
           or(
-            eq(bookingItems.state, "pending_confirmation"),
-            and(eq(bookingItems.state, "confirmed"), isNotNull(bookingItems.cancellationRequestedAt)),
+            and(
+              or(
+                eq(bookingItems.state, "pending_confirmation"),
+                and(
+                  eq(bookingItems.state, "confirmed"),
+                  isNotNull(bookingItems.cancellationRequestedAt),
+                ),
+              ),
+              or(isNull(bookingItems.nextPollAt), lte(bookingItems.nextPollAt, now)),
+            ),
+            and(
+              eq(bookingItems.state, "reserved"),
+              lte(bookingItems.updatedAt, reservedStuckBefore),
+            ),
           ),
           isNull(bookingItems.escalatedAt),
-          or(isNull(bookingItems.nextPollAt), lte(bookingItems.nextPollAt, now)),
         ),
       )
       .orderBy(asc(sql`coalesce(${bookingItems.nextPollAt}, ${bookingItems.createdAt})`))
       .limit(limit);
   }
 
-  /** One full poll pass over a tenant. */
+  /**
+   * One full poll pass over a tenant. One item's failure never aborts the
+   * pass (review M1): a lost optimistic-concurrency race is benign (the
+   * api's cancel or another sweep transitioned the item first — re-read
+   * next sweep), and any other per-item failure is reported and skipped.
+   */
   async pollTenant(tenant: TenantId, limit = 50): Promise<PollReport> {
     const due = await this.duePendingItems(tenant, limit);
     const outcomes: PendingItemOutcome[] = [];
     for (const item of due) {
-      outcomes.push(await this.pollItem(tenant, item));
+      try {
+        outcomes.push(await this.pollItem(tenant, item));
+      } catch (error) {
+        const conflict = error instanceof TransitionConflictError;
+        outcomes.push({
+          bookingItemId: item.id,
+          kind: waitKindOf(item),
+          outcome: conflict ? "conflict_skipped" : "error",
+          detail: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
     return { due: due.length, outcomes };
   }
@@ -137,6 +183,19 @@ export class PendingConfirmationPoller {
   /** Polls ONE item: retrieve at the supplier, act through the runner. */
   async pollItem(tenant: TenantId, item: BookingItemRow): Promise<PendingItemOutcome> {
     const kind = waitKindOf(item);
+    if (kind === "reservation") {
+      // Stranded reserve: the book outcome is unknown (no supplier ref, or
+      // the process died before recording it) — never guess with money on
+      // the line; hand it to a human with the client reference to check.
+      await this.runner.escalate(
+        tenant,
+        item.id,
+        WORKER_ACTOR,
+        "item stuck in reserved past the max pending age — verify with the supplier " +
+          "whether a reservation exists for this booking's clientReference, then fail or confirm it manually",
+      );
+      return { bookingItemId: item.id, kind, outcome: "escalated", detail: "reserved past max age" };
+    }
     if (item.supplierReference === null) {
       // Unreachable by construction (only booked items enter these waits) —
       // but a poll loop must never crash on one bad row: escalate it.
@@ -146,7 +205,11 @@ export class PendingConfirmationPoller {
 
     let record: HotelBookingRecord;
     try {
-      record = await this.retrieve(tenant, item.supplierCode, item.supplierReference);
+      record = await this.retrieve(tenant, {
+        supplierCode: item.supplierCode,
+        supplierBookingReference: item.supplierReference,
+        currency: item.currency,
+      });
     } catch (error) {
       const detail = error instanceof SupplierError ? error.kind : "unexpected retrieve failure";
       const escalated = await this.deferOrEscalate(tenant, item, kind, `retrieve failed: ${detail}`);
@@ -172,23 +235,36 @@ export class PendingConfirmationPoller {
     const kind: PendingWaitKind = "confirmation";
     switch (record.status) {
       case "confirmed": {
+        const cancelPending = item.cancellationRequestedAt !== null;
         await this.runner.transition(tenant, item.id, "confirmed", {
           expectedFrom: "pending_confirmation",
           actor: WORKER_ACTOR,
-          reason: "supplier retrieve reports the booking confirmed",
-          patch: { supplierReference: record.supplierBookingReference },
+          reason: cancelPending
+            ? "supplier retrieve reports the booking confirmed — a requested cancellation is still pending"
+            : "supplier retrieve reports the booking confirmed",
+          patch: {
+            supplierReference: record.supplierBookingReference,
+            // A cancellation requested while the booking was still pending
+            // SURVIVES the confirmation (review M1): the item becomes a
+            // pending-cancel wait immediately instead of falling out of
+            // every sweep with the buyer's cancel silently dropped.
+            ...(cancelPending ? { nextPollAt: this.now() } : {}),
+          },
         });
         return { bookingItemId: item.id, kind, outcome: "transitioned_confirmed" };
       }
       case "cancelled": {
-        // The supplier killed the pending booking. Nothing was recognized
-        // (confirm never posted); the penalty in force now covers the
-        // no-show/auto-cancel fee case, usually zero.
+        // The supplier killed (or settled the requested cancel of) the
+        // pending booking. Nothing was recognized — confirm never posted.
+        // Penalty: the fee quoted when the BUYER requested cancellation;
+        // when the supplier killed it unasked, the buyer owes NOTHING for
+        // a stay the supplier refused (review M1 — never poll-time).
+        const requestedAt = item.cancellationRequestedAt;
         await this.runner.transition(tenant, item.id, "cancelled", {
           expectedFrom: "pending_confirmation",
           actor: WORKER_ACTOR,
           reason: "supplier retrieve reports the pending booking cancelled supplier-side",
-          penalty: penaltyFor(item, this.now()),
+          penalty: requestedAt === null ? null : penaltyFor(item, requestedAt),
         });
         return { bookingItemId: item.id, kind, outcome: "transitioned_cancelled" };
       }

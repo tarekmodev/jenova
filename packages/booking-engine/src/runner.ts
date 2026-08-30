@@ -19,7 +19,7 @@
  * future sagas) goes through `transition`.
  */
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { BookingItemState, CancellationPolicy, Money, SalesChannel, SubTenantId, TenantId, Vertical } from "@jenova/domain";
 import { assertTransition, assertValidMoney } from "@jenova/domain";
 import {
@@ -43,6 +43,19 @@ import type { TenantTx } from "./tx";
 
 export type BookingRow = typeof bookings.$inferSelect;
 export type BookingItemRow = typeof bookingItems.$inferSelect;
+
+/**
+ * Guarded bigint-column → Money-amount conversion (defense in depth, same
+ * idiom as the offer store): a stored amount beyond the safe-integer range
+ * must fail loudly, never silently lose precision.
+ */
+export function moneyAmountFrom(value: bigint, field: string): number {
+  const amount = Number(value);
+  if (!Number.isSafeInteger(amount)) {
+    throw new Error(`${field} exceeds the safe integer range`);
+  }
+  return amount;
+}
 
 /** Who performed the change — recorded verbatim on the AuditEvent. */
 export interface AuditActor {
@@ -289,8 +302,12 @@ export class BookingTransitionRunner {
           ...(patch.cancellationRequestedAt === undefined
             ? {}
             : { cancellationRequestedAt: patch.cancellationRequestedAt }),
-          // Leaving a polled wait: nothing is due any more.
-          ...(to === "pending_confirmation" ? {} : { nextPollAt: patch.nextPollAt ?? null }),
+          // Entering a polled wait: backoff starts fresh. Leaving one:
+          // nothing is due any more (review M1: attempts must never carry
+          // over from a previous wait, or a later wait starts at the cap).
+          ...(to === "pending_confirmation"
+            ? { pollAttempts: 0 }
+            : { nextPollAt: patch.nextPollAt ?? null }),
         })
         .where(and(eq(bookingItems.id, bookingItemId), eq(bookingItems.state, from)))
         .returning({ id: bookingItems.id });
@@ -303,8 +320,8 @@ export class BookingTransitionRunner {
         transitionEdge(from, to),
         { bookingId: item.bookingId, bookingItemId: item.id },
         {
-          sell: { amount: Number(item.sellAmount), currency: item.currency },
-          net: { amount: Number(item.netAmount), currency: item.currency },
+          sell: { amount: moneyAmountFrom(item.sellAmount, "sell_amount"), currency: item.currency },
+          net: { amount: moneyAmountFrom(item.netAmount, "net_amount"), currency: item.currency },
           ...(ctx.penalty === undefined ? {} : { penalty: ctx.penalty }),
         },
         now,
@@ -364,6 +381,9 @@ export class BookingTransitionRunner {
    * asynchronously (e.g. TBO CancellationInProgress). NOT a state
    * transition — the item keeps its state; the worker polls until the
    * supplier reports cancelled and then transitions through `transition`.
+   * Legal on confirmed AND pending_confirmation items (review M1: a cancel
+   * requested against a still-pending booking must survive a later
+   * confirmation — the intent is durable, not tied to the current state).
    * Audited and evented like every state change.
    */
   async markCancellationRequested(
@@ -378,13 +398,15 @@ export class BookingTransitionRunner {
         .update(bookingItems)
         .set({
           cancellationRequestedAt: requestedAt,
+          // A NEW wait: due immediately, backoff from zero (review M1).
           nextPollAt: requestedAt,
+          pollAttempts: 0,
           updatedAt: requestedAt,
         })
         .where(
           and(
             eq(bookingItems.id, bookingItemId),
-            eq(bookingItems.state, "confirmed"),
+            inArray(bookingItems.state, ["confirmed", "pending_confirmation"]),
             isNull(bookingItems.cancellationRequestedAt),
           ),
         )

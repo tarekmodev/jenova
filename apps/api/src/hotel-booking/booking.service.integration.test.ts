@@ -26,6 +26,7 @@ import {
   createTenantDatabase,
   createTenantDbResolver,
   journalEntries,
+  offers as offerRows,
   tenants,
   type TenantDbResolver,
 } from "@jenova/db";
@@ -265,16 +266,17 @@ describe.skipIf(!available)("HotelBookingService — book/cancel over recorded T
     expect(itemAudits.every((a) => a.actorId === ACTOR.actorId)).toBe(true);
   });
 
-  it("consumed the offer: booking it again under a NEW clientReference is refused", async () => {
+  it("consumed the offer: it is invalidated and can never book again", async () => {
     // The booked offer was invalidated on success — no second reservation
-    // can ever be minted from it.
+    // can ever be minted from it, under any clientReference.
     const db = await resolver.getTenantDb(tenant);
     const [item] = await db.select().from(bookingItems).where(eq(bookingItems.id, bookingItemId));
-    const offerId = item?.offerId;
-    expect(offerId).toBeTruthy();
-    await expect(offers.verifyOfferToken(tenant, "of1.tampered.token")).rejects.toMatchObject({
-      kind: "offer_not_found",
-    });
+    expect(item?.offerId).toBeTruthy();
+    const [offerRow] = await db
+      .select({ invalidatedAt: offerRows.invalidatedAt })
+      .from(offerRows)
+      .where(eq(offerRows.id, item?.offerId ?? ""));
+    expect(offerRow?.invalidatedAt).not.toBeNull();
   });
 
   it("idempotent double-book: the SAME clientReference replays the original booking", async () => {
@@ -298,6 +300,30 @@ describe.skipIf(!available)("HotelBookingService — book/cancel over recorded T
 
     const after = await (await resolver.getTenantDb(tenant)).select({ n: count() }).from(bookings);
     expect(after).toEqual(before); // no second booking row, no supplier call
+  });
+
+  it("one offer admits exactly ONE booking attempt — the racing claim loses cleanly", async () => {
+    const { offerToken, offerId } = await issueCheckedOffer();
+    // First claim wins (simulating the concurrent booking that got there
+    // first — the row-level arbitration is identical under true parallelism,
+    // proven by the offer-store's racing-supersede suite).
+    await expect(offers.claimOfferForBooking(tenant, offerId)).resolves.toBe(true);
+
+    const db = await resolver.getTenantDb(tenant);
+    const before = await db.select({ n: count() }).from(bookings);
+    await expect(
+      service.bookHotel(tenant, {
+        offerToken,
+        clientReference: `STRUCT-RACER-${platform.suffix}`,
+        holder: RECORDED_HOLDER,
+        rooms: RECORDED_ROOMS,
+        channel: "b2b",
+        subTenantId: null,
+        actor: ACTOR,
+      }),
+    ).rejects.toMatchObject({ kind: "offer_invalidated" });
+    // The loser wrote NOTHING and never reached the supplier.
+    expect(await db.select({ n: count() }).from(bookings)).toEqual(before);
   });
 
   it("rejects a guest list that does not match the priced occupancy", async () => {

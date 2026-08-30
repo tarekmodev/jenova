@@ -44,6 +44,8 @@ import {
   BookingTransitionRunner,
   DEFAULT_PENDING_BACKOFF,
   loadBookingWithItems,
+  moneyAmountFrom,
+  TransitionConflictError,
   type AuditActor,
   type BookingItemRow,
   type BookingRow,
@@ -51,7 +53,7 @@ import {
 import { bookingItems, bookings, type TenantDbResolver } from "@jenova/db";
 import { eq } from "drizzle-orm";
 import type { SupplierCredentialsSource, SupplierRegistry } from "@jenova/supplier-registry";
-import { SupplierUnavailableError } from "../offers/errors";
+import { OfferError, SupplierUnavailableError } from "../offers/errors";
 import type { OffersService, VerifiedOffer } from "../offers/offers.service";
 import { BookingError } from "./errors";
 
@@ -150,6 +152,19 @@ export class HotelBookingService {
     const policy = this.requirePolicy(offer);
     this.assertGuestsMatchOccupancy(input.rooms, offer);
 
+    // Claim the offer atomically BEFORE anything irreversible: one offer,
+    // one supplier book attempt, ever. Two racing book calls (different
+    // clientReferences, same offer) both pass the gate above — the
+    // rowcount-gated claim admits exactly one to the supplier; the loser is
+    // refused here with no booking row and no supplier call (review M1).
+    const claimed = await this.offers.claimOfferForBooking(tenant, offer.id);
+    if (!claimed) {
+      throw new OfferError(
+        "offer_invalidated",
+        "this offer was already consumed by another booking attempt — check again or search again",
+      );
+    }
+
     const created = await this.runner.createHotelBooking(tenant, {
       clientReference: input.clientReference,
       channel: input.channel,
@@ -163,9 +178,14 @@ export class HotelBookingService {
       actor: input.actor,
     });
     if (!created.created) {
-      // Idempotent replay: the clientReference already booked (or is mid
-      // flight / failed). Return the ORIGINAL state — never re-drive the
-      // supplier from a replayed call.
+      // Idempotent replay via the unique constraint (the race twin of the
+      // findByClientReference fast path). Same scope rule (review M1): a
+      // clientReference owned by ANOTHER agency must not leak its booking.
+      if (created.booking.agencyId !== input.subTenantId) {
+        throw new BookingError("booking_request_invalid", "clientReference is already in use");
+      }
+      // Return the ORIGINAL state — never re-drive the supplier from a
+      // replayed call.
       return this.toBookResult(created.booking, created.item, true);
     }
     const { booking, item } = created;
@@ -185,20 +205,21 @@ export class HotelBookingService {
         rooms: input.rooms,
         clientReference: input.clientReference,
       });
+      if (record.clientReference !== "" && record.clientReference !== input.clientReference) {
+        // Adapter contract violation — an invariant failure. Raised INSIDE
+        // the try (review M1): the supplier may hold a live reservation, so
+        // the item must land in `failed` with the compensation note, never
+        // linger in `reserved`.
+        throw new Error(
+          `adapter ${offer.supplierCode} echoed clientReference ${record.clientReference} for ${input.clientReference}`,
+        );
+      }
     } catch (error) {
-      await this.failAfterReserve(tenant, item.id, input, error);
-      // One book attempt per offer: whatever the failure, this offer is
-      // spent (sold_out/price_changed are dead anyway; on a timeout the
+      // The offer stays claimed: one book attempt per offer, whatever the
+      // failure (sold_out/price_changed are dead anyway; on a timeout the
       // supplier MAY hold a reservation — see the compensation note).
-      await this.offers.invalidateOffer(tenant, offer.id);
+      await this.failAfterReserve(tenant, item.id, input, error);
       throw error;
-    }
-
-    if (record.clientReference !== "" && record.clientReference !== input.clientReference) {
-      // Adapter contract violation — an invariant failure, never mappable.
-      throw new Error(
-        `adapter ${offer.supplierCode} echoed clientReference ${record.clientReference} for ${input.clientReference}`,
-      );
     }
 
     const supplierReference = record.supplierBookingReference;
@@ -241,9 +262,6 @@ export class HotelBookingService {
         },
       });
     }
-    // The offer is consumed — it can never book a second reservation.
-    await this.offers.invalidateOffer(tenant, offer.id);
-
     const settled = await this.loadScoped(tenant, booking.id, input.subTenantId);
     return this.toBookResult(settled.booking, settled.item, false, state);
   }
@@ -306,15 +324,28 @@ export class HotelBookingService {
       item.supplierReference,
     );
 
+    // The supplier's answer is authoritative, but OUR row may have moved
+    // while the call was in flight (the worker can confirm a
+    // pending_confirmation item concurrently) — settle against the FRESH
+    // state, never the pre-call snapshot (review M1).
     if (record.status === "cancelled") {
-      await this.runner.transition(tenant, item.id, "cancelled", {
-        expectedFrom: item.state,
-        actor: scope.actor,
-        reason: "supplier cancelled the booking",
-        patch: { cancellationRequestedAt: now },
-        penalty: preview.penalty.amount === 0 ? null : preview.penalty,
-        details: { supplierStatus: record.status },
-      });
+      const state = await this.settleSupplierCancelled(tenant, item.id, scope.actor, now, preview);
+      return {
+        bookingId: booking.id,
+        bookingItemId: item.id,
+        status: "cancelled",
+        state,
+        preview,
+      };
+    }
+
+    // Async cancellation (e.g. TBO CancellationInProgress). The durable
+    // cancel-intent marker is recorded on confirmed AND pending_confirmation
+    // items alike (review M1): if the worker later confirms a pending item,
+    // the requested cancellation survives as a pending-cancel wait instead
+    // of being silently dropped.
+    const fresh = (await this.loadScoped(tenant, bookingId, scope.subTenantId)).item;
+    if (fresh.state === "cancelled") {
       return {
         bookingId: booking.id,
         bookingItemId: item.id,
@@ -323,21 +354,82 @@ export class HotelBookingService {
         preview,
       };
     }
-
-    // Async cancellation (e.g. TBO CancellationInProgress). For a confirmed
-    // item, park it as a pending-cancel wait the worker polls; a
-    // pending_confirmation item is ALREADY polled — the confirmation wait
-    // settles to cancelled when the supplier reports it.
-    if (item.state === "confirmed") {
-      await this.runner.markCancellationRequested(tenant, item.id, scope.actor, now);
+    if (
+      (fresh.state === "confirmed" || fresh.state === "pending_confirmation") &&
+      fresh.cancellationRequestedAt === null
+    ) {
+      try {
+        await this.runner.markCancellationRequested(tenant, item.id, scope.actor, now);
+      } catch (error) {
+        if (!(error instanceof TransitionConflictError)) {
+          throw error;
+        }
+        // A concurrent cancel/worker action claimed the wait (or settled
+        // it) first — the wait exists either way; fall through.
+      }
     }
     return {
       bookingId: booking.id,
       bookingItemId: item.id,
       status: "cancellation_pending",
-      state: item.state,
+      state: fresh.state,
       preview,
     };
+  }
+
+  /**
+   * The supplier reports the booking cancelled — converge our state onto
+   * that fact even while the worker races us: retry the transition against
+   * the fresh state; if the item keeps moving underneath (or sits in a
+   * state that cannot legally reach cancelled), ESCALATE so the divergence
+   * lands in the manual-intervention queue instead of standing silently
+   * with revenue posted for a supplier-cancelled booking (review M1).
+   */
+  private async settleSupplierCancelled(
+    tenant: TenantId,
+    bookingItemId: string,
+    actor: AuditActor,
+    requestedAt: Date,
+    preview: CancellationPreview,
+  ): Promise<BookingItemState> {
+    const db = await this.resolver.getTenantDb(tenant);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const [fresh] = await db
+        .select()
+        .from(bookingItems)
+        .where(eq(bookingItems.id, bookingItemId));
+      if (fresh === undefined) break;
+      if (fresh.state === "cancelled") {
+        return "cancelled";
+      }
+      if (fresh.state !== "confirmed" && fresh.state !== "pending_confirmation") {
+        break; // cannot legally reach cancelled from here — escalate below
+      }
+      try {
+        await this.runner.transition(tenant, bookingItemId, "cancelled", {
+          expectedFrom: fresh.state,
+          actor,
+          reason: "supplier cancelled the booking",
+          patch: { cancellationRequestedAt: requestedAt },
+          penalty: preview.penalty.amount === 0 ? null : preview.penalty,
+        });
+        return "cancelled";
+      } catch (error) {
+        if (!(error instanceof TransitionConflictError)) {
+          throw error;
+        }
+      }
+    }
+    await this.runner.escalate(
+      tenant,
+      bookingItemId,
+      actor,
+      "supplier reports this booking cancelled but the local item could not be settled — reconcile manually",
+    );
+    throw new BookingError(
+      "booking_not_cancellable",
+      "the supplier cancelled this booking but local settlement conflicted — it has been escalated for manual reconciliation",
+    );
   }
 
   async getBooking(
@@ -362,7 +454,7 @@ export class HotelBookingService {
       clientReference: booking.clientReference,
       state: stateOverride ?? item.state,
       supplierReference: item.supplierReference,
-      sell: { amount: Number(item.sellAmount), currency: item.currency },
+      sell: { amount: moneyAmountFrom(item.sellAmount, "sell_amount"), currency: item.currency },
       idempotentReplay,
     };
   }
@@ -464,7 +556,7 @@ export class HotelBookingService {
   private buildPreview(item: BookingItemRow, at: Date): CancellationPreview {
     const policy = item.policySnapshot;
     const penalty = resolvePenaltyAt(policy, at) ?? zero(item.currency);
-    const sell: Money = { amount: Number(item.sellAmount), currency: item.currency };
+    const sell: Money = { amount: moneyAmountFrom(item.sellAmount, "sell_amount"), currency: item.currency };
     const refund = penalty.currency === sell.currency ? subtract(sell, penalty) : null;
     return { penalty, refund, refundable: policy.refundable, asOf: at };
   }

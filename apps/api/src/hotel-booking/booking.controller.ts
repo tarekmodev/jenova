@@ -18,6 +18,7 @@ import {
 } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
+import { moneyAmountFrom } from "@jenova/booking-engine";
 import { LOCALES, type Money } from "@jenova/domain";
 import { RequiresRealm } from "../gateway/decorators";
 import { ApiHttpError } from "../gateway/errors";
@@ -168,7 +169,7 @@ export class HotelBookingController {
           state: item.state,
           supplierCode: item.supplierCode,
           supplierReference: item.supplierReference,
-          sell: { amount: Number(item.sellAmount), currency: item.currency },
+          sell: { amount: moneyAmountFrom(item.sellAmount, "sell_amount"), currency: item.currency },
           cancellationRequestedAt: item.cancellationRequestedAt?.toISOString() ?? null,
           escalated: item.escalatedAt !== null,
         },

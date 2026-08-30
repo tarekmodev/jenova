@@ -47,20 +47,22 @@ export function makeRetrieveFn(
   registry: SupplierRegistry,
   credentials: SupplierCredentialsSource,
 ): RetrieveBookingFn {
-  return async (tenant, supplierCode, supplierBookingReference) => {
-    const adapter = registry.hotelAdapter(supplierCode);
+  return async (tenant, target) => {
+    const adapter = registry.hotelAdapter(target.supplierCode);
     if (adapter === null) {
-      throw new Error(`no adapter deployed for supplier ${supplierCode}`);
+      throw new Error(`no adapter deployed for supplier ${target.supplierCode}`);
     }
     const ctx: AdapterCallContext = {
-      credentials: await credentials.credentialsFor(tenant, supplierCode),
+      credentials: await credentials.credentialsFor(tenant, target.supplierCode),
       deadline: new Date(Date.now() + RETRIEVE_DEADLINE_MS),
-      // Retrieval addresses an existing reservation; these are contextual.
+      // Retrieval addresses an existing reservation by reference; currency
+      // echoes the ITEM's own (review M1 — no constants on a money path),
+      // nationality is not applicable to retrieval and unused by adapters.
       nationality: "SA",
-      currency: "USD",
+      currency: target.currency,
       locale: "en",
     };
-    return adapter.retrieve(ctx, supplierBookingReference);
+    return adapter.retrieve(ctx, target.supplierBookingReference);
   };
 }
 
