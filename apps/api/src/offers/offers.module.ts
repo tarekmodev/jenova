@@ -16,6 +16,7 @@ import { PricingModule } from "../pricing/pricing.module";
 import {
   createSupplierRegistry,
   EnvSupplierCredentialsSource,
+  ReplaySupplierCredentialsSource,
   SUPPLIER_CREDENTIALS_SOURCE,
   SUPPLIER_REGISTRY,
   UnboundSupplierCredentialsSource,
@@ -69,10 +70,19 @@ import {
       // every other environment fails loudly.
       provide: SUPPLIER_CREDENTIALS_SOURCE,
       inject: [API_CONFIG],
-      useFactory: (config: ApiConfig): SupplierCredentialsSource =>
-        config.nodeEnv === "development"
-          ? new EnvSupplierCredentialsSource()
-          : new UnboundSupplierCredentialsSource(),
+      useFactory: (config: ApiConfig): SupplierCredentialsSource => {
+        switch (config.nodeEnv) {
+          case "development":
+            return new EnvSupplierCredentialsSource();
+          case "test":
+            // Replay transports resolve recordings by fingerprint, never by
+            // credentials — the e2e api process runs on structural
+            // placeholders, same as the integration suites.
+            return new ReplaySupplierCredentialsSource();
+          case "production":
+            return new UnboundSupplierCredentialsSource();
+        }
+      },
     },
     {
       provide: OFFER_CHECK_SERVICE,

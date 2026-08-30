@@ -27,7 +27,7 @@ import { Body, Controller, Inject, Post, Req, Res } from "@nestjs/common";
 import { ApiOperation, ApiProduces, ApiResponse, ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { z } from "zod";
-import { LOCALES, type Money } from "@jenova/domain";
+import { LOCALES, type CancellationPolicy, type Money } from "@jenova/domain";
 import { RequiresRealm } from "../gateway/decorators";
 import { ApiHttpError } from "../gateway/errors";
 import {
@@ -82,6 +82,16 @@ function moneyPayload(value: Money): MoneyPayload {
   return { amount: value.amount, currency: value.currency };
 }
 
+function policyPayload(policy: CancellationPolicy): Record<string, unknown> {
+  return {
+    refundable: policy.refundable,
+    rules: policy.rules.map((rule) => ({
+      fromUtc: rule.fromUtc,
+      penalty: moneyPayload(rule.penalty),
+    })),
+  };
+}
+
 function offerPayload(offer: HotelOfferSummary): Record<string, unknown> {
   return {
     offerId: offer.offerId,
@@ -93,6 +103,7 @@ function offerPayload(offer: HotelOfferSummary): Record<string, unknown> {
     boardBasis: offer.boardBasis,
     sell: moneyPayload(offer.sell),
     refundable: offer.refundable,
+    cancellationPolicy: policyPayload(offer.cancellationPolicy),
   };
 }
 
@@ -142,6 +153,27 @@ const MONEY_SCHEMA = {
   },
 };
 
+const CANCELLATION_POLICY_SCHEMA = {
+  type: "object",
+  required: ["refundable", "rules"],
+  properties: {
+    refundable: { type: "boolean" },
+    rules: {
+      type: "array",
+      description:
+        "Ordered by fromUtc; each penalty applies from its UTC instant until the next rule.",
+      items: {
+        type: "object",
+        required: ["fromUtc", "penalty"],
+        properties: {
+          fromUtc: { type: "string", format: "date-time" },
+          penalty: MONEY_SCHEMA,
+        },
+      },
+    },
+  },
+};
+
 const OFFER_SUMMARY_SCHEMA = {
   type: "object",
   required: [
@@ -154,6 +186,7 @@ const OFFER_SUMMARY_SCHEMA = {
     "boardBasis",
     "sell",
     "refundable",
+    "cancellationPolicy",
   ],
   properties: {
     offerId: { type: "string", format: "uuid" },
@@ -168,6 +201,7 @@ const OFFER_SUMMARY_SCHEMA = {
     boardBasis: { type: "string", enum: ["RO", "BB", "HB", "FB", "AI"] },
     sell: MONEY_SCHEMA,
     refundable: { type: "boolean" },
+    cancellationPolicy: CANCELLATION_POLICY_SCHEMA,
   },
 };
 

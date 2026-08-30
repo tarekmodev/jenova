@@ -27,7 +27,14 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { Locale, Money, SalesChannel, SubTenantId, TenantId } from "@jenova/domain";
+import type {
+  CancellationPolicy,
+  Locale,
+  Money,
+  SalesChannel,
+  SubTenantId,
+  TenantId,
+} from "@jenova/domain";
 import { isSupplierError, type SupplierErrorKind } from "@jenova/domain";
 import type {
   AdapterCallContext,
@@ -77,6 +84,12 @@ export interface HotelOfferSummary {
   /** Server-resolved sell price — never a client-trusted number. */
   readonly sell: Money;
   readonly refundable: boolean;
+  /**
+   * The normalized policy snapshot the offer was issued with (deadlines in
+   * UTC, penalties as Money) — display data for the offer card/detail; the
+   * BOOKED terms are always the snapshot on the signed offer row (#96).
+   */
+  readonly cancellationPolicy: CancellationPolicy;
 }
 
 /**
@@ -416,6 +429,7 @@ export class HotelSearchService {
         boardBasis: offer.boardBasis,
         sell: priced.sell,
         refundable: offer.cancellationPolicy.refundable,
+        cancellationPolicy: offer.cancellationPolicy,
       });
     }
     return summaries;

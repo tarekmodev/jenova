@@ -42,6 +42,13 @@ export {
   createSupplierHttpClient,
 } from "./transport";
 
+export {
+  type ContentCountry,
+  type ContentCity,
+  type ContentProperty,
+  type HotelContentAdapter,
+} from "./content";
+
 export { type FetchFn, createFetchTransport } from "./fetch-transport";
 
 export {
