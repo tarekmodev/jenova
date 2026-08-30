@@ -11,9 +11,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@jenova/domain": "workspace:*"
+    "@jenova/domain": "workspace:*",
+    "undici": "^7.16.0"
   },
   "devDependencies": {
+    "@types/node": "^22.18.0",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

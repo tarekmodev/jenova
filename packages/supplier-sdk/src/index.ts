@@ -23,3 +23,21 @@ export {
   type GroundSupplierAdapter,
   type SupplierAdapter,
 } from "./contracts";
+
+export {
+  TRANSPORT_METHODS,
+  type TransportMethod,
+  type TransportRequest,
+  type TransportResponse,
+  type Transport,
+  type TransportHooks,
+  UndiciTransport,
+  type RetryPolicy,
+  DEFAULT_RETRY_POLICY,
+  type CircuitBreakerOptions,
+  DEFAULT_CIRCUIT_BREAKER_OPTIONS,
+  type CircuitBreakerState,
+  CircuitBreaker,
+  type SupplierHttpClientOptions,
+  createSupplierHttpClient,
+} from "./transport";
