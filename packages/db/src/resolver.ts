@@ -10,6 +10,13 @@
  * - No raw pool, connection, or factory is ever exported; the control-plane
  *   client is a separate export typed only over control-plane tables.
  *
+ * Tenant runtime connections use the LEAST-PRIVILEGE runtime role
+ * (`jenova_runtime`, provisioned by tenant migration 0002), NEVER the
+ * control-plane/migration (owner) credentials: an owner could disable or
+ * drop the ledger/audit triggers, so the append-only and balance guarantees
+ * only hold for a non-owner, non-superuser role (PR #42 review, H1). The
+ * runtime DSN is a required, separate configuration seam.
+ *
  * Pools are lazy (opened on first use per tenant), small (PgBouncer-friendly,
  * `prepare: false`), and capped: beyond `maxPools` distinct tenants the
  * least-recently-used pool is closed.
@@ -19,7 +26,7 @@ import type { TenantId } from "@jenova/domain";
 import { eq } from "drizzle-orm";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { Sql } from "postgres";
-import { serverUrlOf, type ControlPlaneClient } from "./control-plane/client";
+import { type ControlPlaneClient } from "./control-plane/client";
 import { tenants } from "./control-plane/schema";
 import { TenantNotFoundError, TenantNotProvisionedError } from "./errors";
 import { connectPg } from "./internal/pg";
@@ -29,6 +36,13 @@ import * as tenantSchema from "./tenant/schema";
 export type TenantDb = PostgresJsDatabase<typeof tenantSchema>;
 
 export interface TenantDbResolverOptions {
+  /**
+   * Server-level postgres:// DSN carrying the LEAST-PRIVILEGE runtime role's
+   * credentials (host/port/user/password; the database name is swapped per
+   * tenant). Defaults to JENOVA_TENANT_RUNTIME_DSN. Required — the resolver
+   * refuses to run on control-plane/migration (owner) credentials.
+   */
+  runtimeDsn?: string;
   /** Max distinct tenant pools held open; LRU-evicted beyond this (default 50). */
   maxPools?: number;
   /** Max connections per tenant pool (default 4 — keep small, PgBouncer-friendly). */
@@ -52,7 +66,15 @@ export function createTenantDbResolver(
 ): TenantDbResolver {
   const maxPools = options.maxPools ?? 50;
   const connectionsPerTenant = options.connectionsPerTenant ?? 4;
-  const serverUrl = serverUrlOf(controlPlane);
+  const configuredDsn = options.runtimeDsn ?? process.env.JENOVA_TENANT_RUNTIME_DSN;
+  if (configuredDsn === undefined || configuredDsn === "") {
+    throw new Error(
+      "tenant runtime DSN required: pass runtimeDsn or set JENOVA_TENANT_RUNTIME_DSN. " +
+        "The resolver never reuses control-plane/migration (owner) credentials — " +
+        "ledger/audit enforcement only binds the least-privilege jenova_runtime role (see packages/db/README.md).",
+    );
+  }
+  const runtimeDsn: string = configuredDsn;
   const pools = new Map<TenantId, PoolEntry>();
   const inflight = new Map<TenantId, Promise<TenantDb>>();
   let closed = false;
@@ -69,7 +91,7 @@ export function createTenantDbResolver(
     if (tenant.dbName === null) {
       throw new TenantNotProvisionedError(tenantId);
     }
-    const sql = connectPg(serverUrl, tenant.dbName, { max: connectionsPerTenant });
+    const sql = connectPg(runtimeDsn, tenant.dbName, { max: connectionsPerTenant });
     return { sql, db: drizzle(sql, { schema: tenantSchema }), lastUsed: Date.now() };
   }
 

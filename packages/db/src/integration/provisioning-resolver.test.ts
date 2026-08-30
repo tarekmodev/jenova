@@ -31,7 +31,10 @@ describe.skipIf(!available)("provisioning + tenant resolver", () => {
 
   beforeAll(async () => {
     platform = await createTestPlatform();
-    resolver = createTenantDbResolver(platform.controlPlane, { connectionsPerTenant: 2 });
+    resolver = createTenantDbResolver(platform.controlPlane, {
+      runtimeDsn: platform.runtimeDsn,
+      connectionsPerTenant: 2,
+    });
     platform.registerCleanup(() => resolver.close());
   });
 
@@ -67,6 +70,16 @@ describe.skipIf(!available)("provisioning + tenant resolver", () => {
 
     expect(await dbA.select().from(ledgerAccounts)).toHaveLength(1);
     expect(await dbB.select().from(ledgerAccounts)).toHaveLength(0);
+  });
+
+  it("refuses to start without a runtime DSN — owner credentials are never a fallback", () => {
+    const saved = process.env.JENOVA_TENANT_RUNTIME_DSN;
+    delete process.env.JENOVA_TENANT_RUNTIME_DSN;
+    try {
+      expect(() => createTenantDbResolver(platform.controlPlane)).toThrow(/runtime DSN required/);
+    } finally {
+      if (saved !== undefined) process.env.JENOVA_TENANT_RUNTIME_DSN = saved;
+    }
   });
 
   it("type-level: only branded TenantIds enter the resolver", () => {

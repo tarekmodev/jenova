@@ -17,7 +17,7 @@ import {
 } from "@jenova/db";
 
 const controlPlane = connectControlPlane({ url: process.env.CONTROL_PLANE_DATABASE_URL! });
-const resolver = createTenantDbResolver(controlPlane);
+const resolver = createTenantDbResolver(controlPlane); // runtime creds from JENOVA_TENANT_RUNTIME_DSN
 const db = await resolver.getTenantDb(tenantId); // branded TenantId only — raw strings don't compile
 ```
 
@@ -26,6 +26,40 @@ physically connected to that tenant's own database — cross-tenant access is
 impossible, not merely forbidden. Raw pools/connections are never exported.
 Pools are lazy, small (`prepare: false`, PgBouncer-compatible), and
 LRU-capped.
+
+## Two credentials, never mixed
+
+The ledger/audit guarantees (append-only triggers, deferred balance check)
+only bind a role that is **neither superuser nor the table owner** — an owner
+can `ALTER TABLE … DISABLE TRIGGER USER` or `DROP TRIGGER`, and a superuser
+can bypass triggers via `session_replication_role`. So the package separates:
+
+| Path | Role | Credentials |
+|------|------|-------------|
+| Migrations, provisioning, fan-out | schema **owner** | `CONTROL_PLANE_DATABASE_URL` |
+| Request path (the resolver) | **`jenova_runtime`** — least privilege | `JENOVA_TENANT_RUNTIME_DSN` |
+
+`jenova_runtime` (provisioned idempotently by tenant migration
+`0002_tenant_runtime_grants.sql`, so provisioning and the fan-out both apply
+it) is `NOSUPERUSER NOCREATEDB NOCREATEROLE`, owns nothing, has no DDL, and
+holds plain CRUD on ordinary tables but **SELECT + INSERT only** on
+`journal_entry` and `audit_event` — append-only holds at the privilege level
+even before the triggers fire. The resolver **refuses to start** without a
+runtime DSN; it never falls back to owner credentials.
+
+**One shared runtime role, not per-tenant roles**: database-per-tenant plus
+the resolver already make cross-tenant access physically impossible, and a
+single role keeps ops simple (one credential, one PgBouncer user, no
+role-per-signup churn). The trade-off: a leaked runtime credential can reach
+any tenant database (with runtime privileges only — no DDL, no ledger
+rewrites). Revisit per-tenant roles at the dedicated-instance hosting tier.
+
+`jenova_runtime` is created `NOLOGIN`; actual login credentials are a LOGIN
+member role (`CREATE ROLE app LOGIN PASSWORD '…' IN ROLE jenova_runtime`)
+minted by ops — **real staging/production credentials are wired in the
+staging task (#34)**; the seam, role, and grants land here. Tests mint a
+throwaway member per run. Owner/superuser access to tenant databases is a
+break-glass, audited operational path — never the application path.
 
 ## Migrations
 

@@ -64,6 +64,12 @@ export async function expectDbRejection(operation: Promise<unknown>, pattern: Re
 export interface TestPlatform {
   readonly controlPlane: ControlPlaneClient;
   readonly controlPlaneUrl: string;
+  /**
+   * Server-level DSN for a throwaway LOGIN member of the least-privilege
+   * `jenova_runtime` group — what the resolver's runtimeDsn seam expects.
+   * Owner credentials stay on controlPlaneUrl only.
+   */
+  readonly runtimeDsn: string;
   /** Random per-run suffix — use it in every slug/db name a test creates. */
   readonly suffix: string;
   /** Creates an empty database and returns a connection to it (tracked for teardown). */
@@ -98,9 +104,34 @@ export async function createTestPlatform(): Promise<TestPlatform> {
 
   const controlPlane = connectControlPlane({ url: controlPlaneUrl, maxConnections: 2 });
 
+  // The shared jenova_runtime group role is provisioned by tenant migration
+  // 0002 (idempotently) — pre-create it here so a per-run LOGIN member can be
+  // minted before any tenant database exists. Ops does the same in staging
+  // (task #34); the password below is a throwaway local/CI credential.
+  const runtimeUser = `jenova_test_rt_${suffix}`;
+  assertPgIdentifier(runtimeUser);
+  await admin.unsafe(`
+    do $$
+    begin
+      if not exists (select 1 from pg_roles where rolname = 'jenova_runtime') then
+        create role jenova_runtime nologin nosuperuser nocreatedb nocreaterole;
+      end if;
+    exception when duplicate_object then null;
+    end;
+    $$
+  `);
+  await admin.unsafe(
+    `create role "${runtimeUser}" login password 'jenova_test_runtime' nosuperuser nocreatedb nocreaterole in role jenova_runtime`,
+  );
+  const runtimeUrl = new URL(TEST_PG_URL);
+  runtimeUrl.username = runtimeUser;
+  runtimeUrl.password = "jenova_test_runtime";
+  const runtimeDsn = runtimeUrl.toString();
+
   return {
     controlPlane,
     controlPlaneUrl,
+    runtimeDsn,
     suffix,
     async createBareDb(name: string): Promise<Sql> {
       assertPgIdentifier(name);
@@ -140,6 +171,11 @@ export async function createTestPlatform(): Promise<TestPlatform> {
         } catch (error) {
           console.warn(`[@jenova/db tests] failed to drop ${name}:`, error);
         }
+      }
+      try {
+        await admin.unsafe(`drop role if exists "${runtimeUser}"`);
+      } catch (error) {
+        console.warn(`[@jenova/db tests] failed to drop role ${runtimeUser}:`, error);
       }
       await admin.end({ timeout: 1 });
     },

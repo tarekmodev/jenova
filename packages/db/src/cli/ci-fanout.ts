@@ -89,16 +89,22 @@ try {
     const tenantUrl = new URL(serverUrl);
     tenantUrl.pathname = `/${tenant.dbName}`;
     const sql = connectPg(tenantUrl.toString(), undefined, { max: 1 });
-    const [counts] = await sql<{ total: string }[]>`
-      select (select count(*) from booking)
-           + (select count(*) from booking_item)
-           + (select count(*) from journal_entry)
-           + (select count(*) from audit_event)
-           + (select count(*) from supplier_account)
-           + (select count(*) from offer) as total
+    // Exhaustive, exact (not stats-based): every base table in the schema
+    // must hold zero rows — only the migration ledger itself is exempt.
+    const tables = await sql<{ tableName: string }[]>`
+      select table_name as "tableName" from information_schema.tables
+      where table_schema = 'public' and table_type = 'BASE TABLE' and table_name <> '_jenova_migrations'
+      order by table_name
     `;
+    assertOk(tables.length >= 10, `tenant ${tenant.slug} schema looks incomplete (${tables.length} tables)`);
+    for (const { tableName } of tables) {
+      const [row] = await sql<{ n: string }[]>`select count(*) as n from ${sql(tableName)}`;
+      assertOk(
+        row?.n === "0",
+        `tenant ${tenant.slug} table ${tableName} contains ${row?.n ?? "?"} rows — synthetic tenant DBs must be schema-only`,
+      );
+    }
     await sql.end({ timeout: 5 });
-    assertOk(counts?.total === "0", `tenant ${tenant.slug} contains data — synthetic tenant DBs must be schema-only`);
   }
 
   console.log("\nmigration CI gate: OK");
