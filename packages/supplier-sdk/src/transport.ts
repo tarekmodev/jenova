@@ -268,6 +268,12 @@ export function createSupplierHttpClient(options: SupplierHttpClientOptions = {}
       if (isSupplierError(error)) {
         throw error;
       }
+      // sandbox-replay's cache miss must stay loud ("record this scenario
+      // first") — wrapping it as a timeout would let CI mistake a missing
+      // recording for supplier flakiness (docs/09-testing.md).
+      if (error instanceof Error && error.name === "ReplayMissError") {
+        throw error;
+      }
       throw new SupplierError(
         "supplier_timeout",
         `transport failure calling ${ctx.credentials.supplierCode} (${ctx.credentials.environment})`,

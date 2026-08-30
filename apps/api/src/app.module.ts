@@ -19,6 +19,8 @@ import { HTTP_SERVER_HOOKS, noopHttpServerHooks } from "./observability/instrume
 
 @Module({
   // ConfigModule fails fast (ApiConfigError) before the app can listen.
+  // OffersModule provides SUPPLIER_REGISTRY (the TBO adapter binds there —
+  // the supplier-registry dir stays the only adapter import point).
   imports: [ConfigModule, GatewayModule, PricingModule, OffersModule],
   controllers: [HealthController],
   providers: [

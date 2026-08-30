@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "supplier": "tbo",
+  "fingerprint": "post-api-tbotechnology-in-tboholidays-hotelapi-cancel-e862df62523e",
+  "request": {
+    "method": "POST",
+    "url": "https://api.tbotechnology.in/TBOHolidays_HotelAPI/Cancel",
+    "headers": {
+      "accept": "application/json",
+      "authorization": "[REDACTED]",
+      "content-type": "application/json"
+    },
+    "body": "{\"ConfirmationNumber\":\"LVFXI5\"}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "cache-control": "no-cache",
+      "connection": "keep-alive",
+      "content-length": "79",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Sun, 30 Aug 2026 16:15:38 GMT",
+      "expires": "-1",
+      "pragma": "no-cache",
+      "server": "WebServer",
+      "strict-transport-security": "max-age=31536000; includeSubDomains; preload"
+    },
+    "body": "{\"Status\":{\"Code\":200,\"Description\":\"Cancelled\"},\"ConfirmationNumber\":\"LVFXI5\"}"
+  },
+  "timings": {
+    "durationMs": 4707
+  }
+}

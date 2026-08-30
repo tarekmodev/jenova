@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@jenova/adapter-hotel-tbo": "workspace:*",
     "@jenova/db": "workspace:*",
     "@jenova/domain": "workspace:*",
     "@jenova/supplier-sdk": "workspace:*",

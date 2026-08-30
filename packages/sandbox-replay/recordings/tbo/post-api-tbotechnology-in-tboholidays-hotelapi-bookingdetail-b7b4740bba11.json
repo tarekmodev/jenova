@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "supplier": "tbo",
+  "fingerprint": "post-api-tbotechnology-in-tboholidays-hotelapi-bookingdetail-b7b4740bba11",
+  "request": {
+    "method": "POST",
+    "url": "https://api.tbotechnology.in/TBOHolidays_HotelAPI/BookingDetail",
+    "headers": {
+      "accept": "application/json",
+      "authorization": "[REDACTED]",
+      "content-type": "application/json"
+    },
+    "body": "{\"ConfirmationNumber\":\"JENOVAX\",\"PaymentMode\":\"Limit\"}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "cache-control": "no-cache",
+      "connection": "keep-alive",
+      "content-length": "86",
+      "content-type": "application/json; charset=utf-8",
+      "date": "Sun, 30 Aug 2026 16:22:56 GMT",
+      "expires": "-1",
+      "pragma": "no-cache",
+      "server": "WebServer",
+      "strict-transport-security": "max-age=31536000; includeSubDomains; preload"
+    },
+    "body": "{\"Status\":{\"Code\":400,\"Description\":\"Booking does not exist for the requested input\"}}"
+  },
+  "timings": {
+    "durationMs": 307
+  }
+}

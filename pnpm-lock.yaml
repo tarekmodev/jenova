@@ -44,6 +44,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@jenova/adapter-hotel-tbo':
+        specifier: workspace:*
+        version: link:../../packages/adapters/hotel/tbo
       '@jenova/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -224,7 +227,26 @@ importers:
         version: 4.1.11(@types/node@22.20.1)(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(tsx@4.23.12))
 
   packages/adapters/hotel/tbo:
+    dependencies:
+      '@jenova/domain':
+        specifier: workspace:*
+        version: link:../../../domain
+      '@jenova/sandbox-replay':
+        specifier: workspace:*
+        version: link:../../../sandbox-replay
+      '@jenova/supplier-sdk':
+        specifier: workspace:*
+        version: link:../../../supplier-sdk
+      zod:
+        specifier: ^4.1.12
+        version: 4.5.2
     devDependencies:
+      '@types/node':
+        specifier: ^22.18.0
+        version: 22.20.1
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.12
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
