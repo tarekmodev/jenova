@@ -6,6 +6,8 @@ export {
   expectSupplierErrorKind,
   type HotelHappyPathScenario,
   type HotelErrorScenario,
+  type HotelErrorEvidence,
+  type HotelErrorScenarioEntry,
   type HotelAdapterContractOptions,
   describeHotelAdapterContract,
 } from "./harness";

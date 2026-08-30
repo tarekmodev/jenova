@@ -92,7 +92,7 @@ describe("formatCertificationReport", () => {
     expect(report).toContain("- Mode: live");
     expect(report).toContain("| lifecycle.search — search returns offers | PASS |");
     expect(report).toContain("| error.sold_out — maps sold_out | TODO | record first |");
-    expect(report).toContain("2 (1 passed, 0 failed, 0 skipped, 1 todo)");
+    expect(report).toContain("2 (1 passed, 0 evidence-backed, 0 failed, 0 skipped, 1 todo)");
   });
 
   it("is CERTIFIABLE only for a clean live run", () => {
@@ -109,5 +109,42 @@ describe("formatCertificationReport", () => {
         { id: "b", title: "t", status: "failed" },
       ]),
     ).toContain("Verdict: NOT CERTIFIABLE");
+  });
+
+  it("renders declared evidence distinctly and counts it toward a live CERTIFIABLE verdict", () => {
+    const report = formatCertificationReport({ ...run, mode: "live" }, [
+      { id: "lifecycle.search", title: "search returns offers", status: "passed" },
+      {
+        id: "error.rate_limited",
+        title: "evidence: rate_limited",
+        status: "evidence",
+        detail: "mechanism-verified at the transport seam",
+      },
+    ]);
+    expect(report).toContain(
+      "| error.rate_limited — evidence: rate_limited | EVIDENCE | mechanism-verified at the transport seam |",
+    );
+    expect(report).toContain("(1 passed, 1 evidence-backed, 0 failed, 0 skipped, 0 todo)");
+    expect(report).toContain(
+      "**Verdict: CERTIFIABLE** — 1 checks passed against the live sandbox; 1 certified on standing evidence",
+    );
+  });
+
+  it("declared evidence never rescues a failed, skipped or todo check", () => {
+    const evidence = {
+      id: "error.rate_limited",
+      title: "evidence: rate_limited",
+      status: "evidence",
+    } as const;
+    expect(
+      formatCertificationReport({ ...run, mode: "live" }, [
+        evidence,
+        { id: "error.sold_out", title: "maps sold_out", status: "todo" },
+      ]),
+    ).toContain("Verdict: NOT CERTIFIABLE");
+    // Recorded runs stay NOT CERTIFIABLE regardless of evidence declarations.
+    expect(formatCertificationReport({ ...run, mode: "recorded" }, [evidence])).toContain(
+      "Verdict: NOT CERTIFIABLE",
+    );
   });
 });
