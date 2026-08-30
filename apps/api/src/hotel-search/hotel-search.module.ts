@@ -22,6 +22,7 @@ import {
   type SupplierRegistry,
 } from "../supplier-registry";
 import { TENANT_DB_RESOLVER, TenantDbModule } from "../tenancy/tenant-db.module";
+import { HotelSearchController } from "./search.controller";
 import { HOTEL_SEARCH_SERVICE, HotelSearchService } from "./search.service";
 import {
   DrizzleSupplierAccountsSource,
@@ -31,6 +32,7 @@ import {
 
 @Module({
   imports: [ConfigModule, OffersModule, PricingModule, TenantDbModule],
+  controllers: [HotelSearchController],
   providers: [
     {
       provide: SUPPLIER_ACCOUNTS_SOURCE,
