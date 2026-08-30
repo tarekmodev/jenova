@@ -11,10 +11,9 @@
 
 import { Module } from "@nestjs/common";
 import type { ControlPlaneClient, TenantDbResolver } from "@jenova/db";
-import { API_CONFIG, type ApiConfig } from "../config/config";
 import { ConfigModule } from "../config/config.module";
 import { ControlPlaneEntitlementSource } from "../tenancy/control-plane-directory";
-import { secretBoxFromConfig, SECRET_BOX, type SecretBox } from "../tenancy/secret-box";
+import { SECRET_BOX, type SecretBox } from "../tenancy/secret-box";
 import {
   CONTROL_PLANE_CLIENT,
   TENANT_DB_RESOLVER,
@@ -66,11 +65,6 @@ export const TOTP_VERIFIER = Symbol("jenova.api.totpVerifier");
       useFactory: (replay: TotpReplayStore) => new TotpVerifier(replay),
     },
     {
-      provide: SECRET_BOX,
-      inject: [API_CONFIG],
-      useFactory: (config: ApiConfig) => secretBoxFromConfig(config),
-    },
-    {
       provide: STAFF_USER_STORE,
       inject: [TENANT_DB_RESOLVER],
       useFactory: (resolver: TenantDbResolver) => new DrizzleStaffUserStore(resolver),
@@ -99,7 +93,6 @@ export const TOTP_VERIFIER = Symbol("jenova.api.totpVerifier");
     MACHINE_AUTH,
     TOTP_REPLAY_STORE,
     TOTP_VERIFIER,
-    SECRET_BOX,
     STAFF_USER_STORE,
     STAFF_AUTH_SERVICE,
     ENTITLEMENT_READER,

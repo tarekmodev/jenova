@@ -23,6 +23,27 @@ export function isStaffRole(value: string): value is StaffRole {
 
 export type StaffUserRecord = typeof staffUsers.$inferSelect;
 
+/** Serializable projection — NEVER carries hashes or sealed secrets. */
+export function staffProfileRowOf(user: StaffUserRecord): {
+  readonly id: string;
+  readonly email: string;
+  readonly displayName: string;
+  readonly role: string;
+  readonly status: string;
+  readonly totpEnrolled: boolean;
+  readonly createdAt: string;
+} {
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    role: user.role,
+    status: user.status,
+    totpEnrolled: user.totpSecretEncrypted !== null,
+    createdAt: user.createdAt.toISOString(),
+  };
+}
+
 export interface CreateStaffUserInput {
   readonly email: string;
   readonly displayName: string;
@@ -47,7 +68,10 @@ export interface StaffUserStore {
   updateProfile(
     tenant: TenantId,
     id: string,
-    patch: { readonly displayName?: string; readonly role?: StaffRole },
+    patch: {
+      readonly displayName?: string | undefined;
+      readonly role?: StaffRole | undefined;
+    },
   ): Promise<StaffUserRecord | null>;
   setStatus(tenant: TenantId, id: string, status: StaffUserStatus): Promise<StaffUserRecord | null>;
   /** Upgrade-on-login rehash (password.ts `passwordNeedsRehash`). */

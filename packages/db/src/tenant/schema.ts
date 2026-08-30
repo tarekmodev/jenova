@@ -46,7 +46,13 @@ export type PaymentState = (typeof PAYMENT_STATES)[number];
 export const LEDGER_ACCOUNT_TYPES = ["asset", "liability", "equity", "revenue", "expense"] as const;
 export type LedgerAccountType = (typeof LEDGER_ACCOUNT_TYPES)[number];
 
-export const AUDIT_ACTOR_TYPES = ["platform_user", "agency_user", "system", "api_client"] as const;
+export const AUDIT_ACTOR_TYPES = [
+  "platform_user",
+  "agency_user",
+  "staff_user",
+  "system",
+  "api_client",
+] as const;
 export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number];
 
 /**

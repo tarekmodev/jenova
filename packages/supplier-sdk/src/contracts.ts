@@ -169,6 +169,15 @@ export interface HotelBookingRecord {
 export interface HotelSupplierAdapter {
   readonly supplierCode: string;
   readonly vertical: "hotel";
+  /**
+   * Cheapest call that proves the credentials work (Settings
+   * "test connection", docs/apps/core-workspace.md) — a static-content
+   * read, NEVER a search (look-to-book is a commercial obligation).
+   * Resolves on success; rejects with a taxonomy SupplierError
+   * (auth_failed for bad credentials). Optional: a supplier with no cheap
+   * probe simply doesn't offer one.
+   */
+  testConnection?(ctx: AdapterCallContext): Promise<void>;
   search(ctx: AdapterCallContext, query: HotelSearchQuery): Promise<readonly HotelOffer[]>;
   /**
    * Revalidate price/availability just before booking. Rejects with
