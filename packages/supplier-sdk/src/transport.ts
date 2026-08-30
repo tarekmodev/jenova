@@ -213,6 +213,18 @@ export class CircuitBreaker {
     }
   }
 
+  /**
+   * An outcome that proves nothing about supplier health — e.g. a
+   * sandbox-replay miss in CI, where no supplier was ever dialed. Releases a
+   * half-open probe slot (so the breaker cannot wedge waiting on a probe
+   * that never reached a supplier) but leaves the state and the
+   * consecutive-failure count untouched in every direction: it neither
+   * counts toward opening, nor resets the count, nor restarts the cooldown.
+   */
+  recordInconclusive(): void {
+    this.#probeInFlight = false;
+  }
+
   #trip(): void {
     this.#state = "open";
     this.#openedAt = this.#now();
@@ -240,6 +252,15 @@ export interface SupplierHttpClientOptions {
 
 const defaultSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Matched by name, not instanceof — @jenova/supplier-sdk deliberately does
+ * not depend on @jenova/sandbox-replay (the replayer wraps this layer from
+ * the outside; docs/09-testing.md).
+ */
+function isReplayMiss(error: unknown): boolean {
+  return error instanceof Error && error.name === "ReplayMissError";
+}
 
 /**
  * The client every adapter uses. It is itself a Transport, so composition
@@ -271,7 +292,7 @@ export function createSupplierHttpClient(options: SupplierHttpClientOptions = {}
       // sandbox-replay's cache miss must stay loud ("record this scenario
       // first") — wrapping it as a timeout would let CI mistake a missing
       // recording for supplier flakiness (docs/09-testing.md).
-      if (error instanceof Error && error.name === "ReplayMissError") {
+      if (isReplayMiss(error)) {
         throw error;
       }
       throw new SupplierError(
@@ -329,7 +350,14 @@ export function createSupplierHttpClient(options: SupplierHttpClientOptions = {}
           }
         })();
       } catch (error) {
-        breaker.recordFailure();
+        // A replay miss means no supplier was dialed at all: it must surface
+        // as "record this scenario first", never accumulate into a
+        // misleading "circuit open" (review #74 L3).
+        if (isReplayMiss(error)) {
+          breaker.recordInconclusive();
+        } else {
+          breaker.recordFailure();
+        }
         throw error;
       }
       if (result.status >= 500) {
