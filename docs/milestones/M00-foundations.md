@@ -8,7 +8,7 @@ test it, and ship a reviewed PR to staging — unaided.
       module-boundary rule (apps can't import apps; only the supplier registry imports
       adapters; adapters can't import engine modules).
 - [ ] `CLAUDE.md` (root) — the agent conventions, final version.
-- [ ] `domain` package: Money, tenancy brands, SalesChannel/AppKey/Vertical types,
+- [x] `domain` package: Money, tenancy brands, SalesChannel/AppKey/Vertical types,
       BookingItemState machine as data, CancellationPolicy, SupplierError taxonomy.
       Unit + property tests (money arithmetic, transition legality).
 - [ ] `db` package: control-plane schema v1 (Tenant, AppInstallation, PlatformUser,
@@ -16,7 +16,7 @@ test it, and ship a reviewed PR to staging — unaided.
       Booking, BookingItem, LedgerAccount, JournalEntry, AuditEvent, Offer);
       **per-tenant database provisioning** + **fan-out migration runner** with dry-run,
       per-tenant failure isolation, resume; tenant connection resolver (the only door).
-- [ ] `supplier-sdk` package: HotelSupplierAdapter interface + AdapterCallContext +
+- [x] `supplier-sdk` package: HotelSupplierAdapter interface + AdapterCallContext +
       credentials types; transport codecs skeleton (retrying HTTP client with deadline
       budgets + circuit breaker; JSON codec; XML/SOAP codec with schema validation);
       contract-test harness skeleton.
