@@ -7,6 +7,8 @@ packages:
 allowBuilds:
   # Nest core pulls @scarf/scarf, whose postinstall is install analytics — never run it.
   '@scarf/scarf': false
+  # esbuild ships the platform binary as an optional dependency; its install
+  # script only verifies it (needed by tsx, which runs the migration CLIs).
   esbuild: true
   unrs-resolver: true
 
