@@ -54,6 +54,8 @@ export type CheckOfferResult =
       readonly sell: Money;
       readonly expiresAt: Date;
       readonly checkedAt: Date;
+      /** Policy snapshot in force on the bookable offer (display; #97). */
+      readonly cancellationPolicy: CancellationPolicy | null;
     }
   | {
       readonly status: "price_changed";
@@ -65,6 +67,8 @@ export type CheckOfferResult =
       readonly newExpiresAt: Date;
       /** True when the cancellation policy moved (with or without the price). */
       readonly policyChanged: boolean;
+      /** The successor's policy snapshot — what re-approval accepts (#97). */
+      readonly newCancellationPolicy: CancellationPolicy | null;
     };
 
 export interface OfferCheckServiceOptions {
@@ -149,6 +153,7 @@ export class OfferCheckService {
         sell: offer.sell,
         expiresAt: offer.expiresAt,
         checkedAt,
+        cancellationPolicy: offer.policySnapshot,
       };
     }
 
@@ -176,6 +181,7 @@ export class OfferCheckService {
         sell: successor.record.sell,
         expiresAt: successor.record.expiresAt,
         checkedAt: successor.checkedAt,
+        cancellationPolicy: successor.record.policySnapshot,
       };
     }
 
@@ -187,6 +193,7 @@ export class OfferCheckService {
       newOfferToken: successor.token,
       newExpiresAt: successor.record.expiresAt,
       policyChanged: !policyUnchanged,
+      newCancellationPolicy: successor.record.policySnapshot,
     };
   }
 

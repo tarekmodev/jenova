@@ -9,7 +9,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Inject, Post, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { LOCALES, type Money } from "@jenova/domain";
+import { LOCALES, type CancellationPolicy, type Money } from "@jenova/domain";
 import { RequiresRealm } from "../gateway/decorators";
 import { ApiHttpError } from "../gateway/errors";
 import {
@@ -31,6 +31,11 @@ interface MoneyPayload {
   readonly currency: string;
 }
 
+interface PolicyPayload {
+  readonly refundable: boolean;
+  readonly rules: readonly { readonly fromUtc: string; readonly penalty: MoneyPayload }[];
+}
+
 type CheckOfferResponse =
   | {
       readonly status: "unchanged";
@@ -39,6 +44,7 @@ type CheckOfferResponse =
       readonly sell: MoneyPayload;
       readonly expiresAt: string;
       readonly checkedAt: string;
+      readonly cancellationPolicy: PolicyPayload | null;
     }
   | {
       readonly status: "price_changed";
@@ -48,10 +54,24 @@ type CheckOfferResponse =
       readonly newOfferToken: string;
       readonly newExpiresAt: string;
       readonly policyChanged: boolean;
+      readonly newCancellationPolicy: PolicyPayload | null;
     };
 
 function moneyPayload(value: Money): MoneyPayload {
   return { amount: value.amount, currency: value.currency };
+}
+
+function policyPayload(policy: CancellationPolicy | null): PolicyPayload | null {
+  if (policy === null) {
+    return null;
+  }
+  return {
+    refundable: policy.refundable,
+    rules: policy.rules.map((rule) => ({
+      fromUtc: rule.fromUtc,
+      penalty: moneyPayload(rule.penalty),
+    })),
+  };
 }
 
 function toResponse(result: CheckOfferResult): CheckOfferResponse {
@@ -63,6 +83,7 @@ function toResponse(result: CheckOfferResult): CheckOfferResponse {
       sell: moneyPayload(result.sell),
       expiresAt: result.expiresAt.toISOString(),
       checkedAt: result.checkedAt.toISOString(),
+      cancellationPolicy: policyPayload(result.cancellationPolicy),
     };
   }
   return {
@@ -73,6 +94,7 @@ function toResponse(result: CheckOfferResult): CheckOfferResponse {
     newOfferToken: result.newOfferToken,
     newExpiresAt: result.newExpiresAt.toISOString(),
     policyChanged: result.policyChanged,
+    newCancellationPolicy: policyPayload(result.newCancellationPolicy),
   };
 }
 
