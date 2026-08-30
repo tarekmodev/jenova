@@ -4,10 +4,23 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@jenova/domain": "workspace:*",
+    "@jenova/ui": "workspace:*",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@types/node": "^22.18.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

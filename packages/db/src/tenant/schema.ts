@@ -79,6 +79,9 @@ export const agencies = pgTable("agency", {
   creditCurrency: char("credit_currency", { length: 3 }),
   paymentTermsDays: integer("payment_terms_days"),
   allowedCurrencies: jsonb("allowed_currencies").$type<string[]>().notNull().default([]),
+  // 0005: default guest nationality for this agency's searches (rule 9) —
+  // a per-agency DEFAULT the agent can always override per search.
+  defaultNationality: char("default_nationality", { length: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
@@ -94,6 +97,8 @@ export const agencyUsers = pgTable("agency_user", {
   displayName: text("display_name").notNull(),
   role: text("role").notNull(),
   status: text("status").notNull().default("active"),
+  // 0005: argon2id PHC string (login flows). NULL can never log in.
+  passwordHash: text("password_hash"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 

@@ -11,16 +11,29 @@
  */
 
 import { Inject, Module, type OnApplicationShutdown } from "@nestjs/common";
-import { connectControlPlane, createTenantDbResolver, type TenantDbResolver } from "@jenova/db";
+import {
+  connectControlPlane,
+  createTenantDbResolver,
+  type ControlPlaneClient,
+  type TenantDbResolver,
+} from "@jenova/db";
 import { API_CONFIG, type ApiConfig } from "../config/config";
 import { ConfigModule } from "../config/config.module";
 
 /** Nest injection token for the process-wide {@link TenantDbResolver}. */
 export const TENANT_DB_RESOLVER = Symbol("jenova.api.tenantDbResolver");
 
+/**
+ * Nest injection token for the process-wide control-plane client — the SAME
+ * client the resolver reads (one pool). Control-plane data only (tenant
+ * directory, tenant branding); tenant data goes through the resolver.
+ */
+export const CONTROL_PLANE_CLIENT = Symbol("jenova.api.controlPlaneClient");
+
 /** The resolver plus the control-plane client it reads — closed together. */
 interface TenantDbRuntime {
   readonly resolver: TenantDbResolver;
+  readonly controlPlane: ControlPlaneClient;
   close(): Promise<void>;
 }
 
@@ -48,6 +61,7 @@ class TenantDbLifecycle implements OnApplicationShutdown {
         });
         return {
           resolver,
+          controlPlane,
           close: async () => {
             await resolver.close();
             await controlPlane.close();
@@ -60,8 +74,13 @@ class TenantDbLifecycle implements OnApplicationShutdown {
       inject: [TENANT_DB_RUNTIME],
       useFactory: (runtime: TenantDbRuntime) => runtime.resolver,
     },
+    {
+      provide: CONTROL_PLANE_CLIENT,
+      inject: [TENANT_DB_RUNTIME],
+      useFactory: (runtime: TenantDbRuntime) => runtime.controlPlane,
+    },
     TenantDbLifecycle,
   ],
-  exports: [TENANT_DB_RESOLVER],
+  exports: [TENANT_DB_RESOLVER, CONTROL_PLANE_CLIENT],
 })
 export class TenantDbModule {}

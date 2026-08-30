@@ -21,6 +21,7 @@ export {
   CERTIFICATION_STATUSES,
   type CertificationStatus,
   tenants,
+  tenantDomains,
   appInstallations,
   platformUsers,
   supplierCatalogEntries,

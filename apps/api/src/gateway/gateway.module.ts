@@ -15,19 +15,27 @@ import {
   RateLimitStage,
   TenantResolutionStage,
 } from "./stages";
-import { TENANT_DIRECTORY, UnboundTenantDirectory, type TenantDirectory } from "./tenant-directory";
+import type { ControlPlaneClient } from "@jenova/db";
+import { CONTROL_PLANE_CLIENT, TenantDbModule } from "../tenancy/tenant-db.module";
+import { ControlPlaneTenantDirectory } from "./control-plane-tenant-directory";
+import { TENANT_DIRECTORY, type TenantDirectory } from "./tenant-directory";
 
 /**
- * Binds the gateway chain into Nest. The M0 defaults (unbound tenant
- * directory, deny-all entitlements, no-op rate limiter, in-memory session
- * and machine-key stores from AuthModule) are replaced via their tokens
- * when the control-plane/redis wiring lands (post-#42) — the pipeline
- * assembly below never changes.
+ * Binds the gateway chain into Nest. The tenant directory is control-plane-
+ * backed since M2 (#95: `tenant_domain`, migration 0002); the remaining M0
+ * defaults (deny-all entitlements, no-op rate limiter, in-memory session and
+ * machine-key stores from AuthModule) are replaced via their tokens when
+ * their wiring lands — the pipeline assembly below never changes.
  */
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, TenantDbModule],
   providers: [
-    { provide: TENANT_DIRECTORY, useClass: UnboundTenantDirectory },
+    {
+      provide: TENANT_DIRECTORY,
+      inject: [CONTROL_PLANE_CLIENT],
+      useFactory: (controlPlane: ControlPlaneClient) =>
+        new ControlPlaneTenantDirectory(controlPlane),
+    },
     { provide: ENTITLEMENT_SOURCE, useClass: DenyAllEntitlementSource },
     { provide: RATE_LIMITER, useClass: NoopRateLimiter },
     {

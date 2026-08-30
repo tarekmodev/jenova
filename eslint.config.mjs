@@ -20,6 +20,7 @@ export default tseslint.config(
       "**/node_modules/**",
       "**/dist/**",
       "**/.next/**",
+      "**/next-env.d.ts",
       "**/.turbo/**",
       "**/coverage/**",
       "**/storybook-static/**",
