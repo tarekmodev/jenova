@@ -127,10 +127,23 @@ export const markupRules = pgTable(
   (t) => [index("markup_rule_priority_ix").on(t.priority)],
 );
 
+/** Occupancy summary one offer was priced for — one entry per room. */
+export interface OfferRoomOccupancy {
+  readonly adults: number;
+  /** One age per child, in years at check-in. Empty when none. */
+  readonly childAges: readonly number[];
+}
+
 /**
  * Short-lived server-priced result — the ONLY bookable thing (CLAUDE.md
  * rule 8). Carries the signed price hash, TTL expiry, and the id of the
  * markup rule that fired.
+ *
+ * The 0003 offer-store columns are nullable at the SQL level (expand-only
+ * migration); the offers service writes them on every new row and treats a
+ * row missing them as unverifiable. `breakdown` / `pricingContext` hold the
+ * api pricing engine's PriceBreakdown / PricingContext shapes — typed as
+ * loose records here because the db package never imports engine code.
  */
 export const offers = pgTable("offer", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -144,6 +157,14 @@ export const offers = pgTable("offer", {
   policySnapshot: jsonb("policy_snapshot").$type<CancellationPolicy>(),
   expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  supplierOfferToken: text("supplier_offer_token"),
+  canonicalPropertyId: text("canonical_property_id"),
+  nationality: char("nationality", { length: 2 }),
+  occupancy: jsonb("occupancy").$type<readonly OfferRoomOccupancy[]>(),
+  breakdown: jsonb("breakdown").$type<Record<string, unknown>>(),
+  pricingContext: jsonb("pricing_context").$type<Record<string, unknown>>(),
+  checkedAt: timestamp("checked_at", { withTimezone: true, mode: "date" }),
+  invalidatedAt: timestamp("invalidated_at", { withTimezone: true, mode: "date" }),
 });
 
 /**

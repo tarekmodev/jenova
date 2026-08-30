@@ -9,22 +9,19 @@
  */
 
 import { Module } from "@nestjs/common";
-import { API_CONFIG, loadApiConfig } from "./config/config";
+import { ConfigModule } from "./config/config.module";
 import { GatewayModule } from "./gateway/gateway.module";
+import { OffersModule } from "./offers/offers.module";
 import { PricingModule } from "./pricing/pricing.module";
 import { HealthController } from "./health/health.controller";
 import { READINESS_CHECKS } from "./health/readiness";
 import { HTTP_SERVER_HOOKS, noopHttpServerHooks } from "./observability/instrumentation";
 
 @Module({
-  imports: [GatewayModule, PricingModule],
+  // ConfigModule fails fast (ApiConfigError) before the app can listen.
+  imports: [ConfigModule, GatewayModule, PricingModule, OffersModule],
   controllers: [HealthController],
   providers: [
-    {
-      provide: API_CONFIG,
-      // Fails fast (ApiConfigError) before the app can listen.
-      useFactory: () => loadApiConfig(process.env),
-    },
     {
       // M0: empty set. Control-plane DB / redis checks register here once
       // their clients are wired (after #42).

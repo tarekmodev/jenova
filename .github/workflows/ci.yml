@@ -78,3 +78,11 @@ jobs:
         run: pnpm --filter @jenova/db test
         env:
           JENOVA_TEST_PG_URL: postgres://jenova:jenova@localhost:5432/jenova
+
+      # The api's tenant-data services (offer store) prove their SQL against
+      # the same disposable server; without JENOVA_TEST_PG_URL those suites
+      # skip loudly (main ci job), here they must run.
+      - name: api service tests (against the CI Postgres)
+        run: pnpm --filter @jenova/api test
+        env:
+          JENOVA_TEST_PG_URL: postgres://jenova:jenova@localhost:5432/jenova
