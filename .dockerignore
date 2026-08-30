@@ -1,0 +1,20 @@
+# Keep the build context to what `pnpm install` + tsx runtime need. Every
+# workspace member's sources and manifests must stay in (pnpm-workspace.yaml
+# lists packages/*, packages/adapters/*/*, apps/*, e2e).
+.git
+.claude
+.github
+docs
+infra
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+coverage
+.env
+.env.*
+!.env.example
+packages/sandbox-replay/raw-captures
+Dockerfile
+.dockerignore

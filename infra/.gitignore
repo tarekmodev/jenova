@@ -1,0 +1,13 @@
+# Terraform local artifacts — state (bootstrap keeps local state), plans,
+# provider binaries. Lock files (.terraform.lock.hcl) ARE committed.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+*.auto.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

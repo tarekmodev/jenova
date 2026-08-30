@@ -31,7 +31,9 @@ test it, and ship a reviewed PR to staging — unaided.
 - [x] CI: lint, typecheck, tests, migration fan-out dry-run on synthetic tenant DBs
       (real job: fresh control-plane + 3 synthetic tenant DBs, dry-run then apply,
       plus the db integration suite — schema only, no fabricated data).
-- [ ] Staging: Terraform for one VM + managed Postgres in me-south-1; deploy on main.
+- [x] Staging: Terraform for one VM + managed Postgres in me-south-1; deploy on main
+      (`infra/` + `.github/workflows/deploy-staging.yml`; first `apply` awaits AWS
+      credentials — runbook in `infra/README.md`).
 
 ## Agent workstreams (parallel)
 1. **repo+ci** — workspaces, lint rules, CI, Compose.

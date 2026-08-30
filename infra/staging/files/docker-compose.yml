@@ -1,0 +1,41 @@
+# Staging compose unit, provisioned to /opt/jenova by cloud-init (ec2.tf).
+# One image for api + worker (docs/10: identical containerized artifact;
+# configuration is the only difference). JENOVA_TAG and all runtime env come
+# from /opt/jenova/.env, written by fetch-env.sh from SSM Parameter Store.
+services:
+  api:
+    image: ghcr.io/tarekmodev/jenova:${JENOVA_TAG:-latest}
+    command: ["pnpm", "--filter", "@jenova/api", "start"]
+    env_file: /opt/jenova/.env
+    environment:
+      NODE_ENV: production
+      API_PORT: "3000"
+    ports:
+      - "80:3000"
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      - redis
+
+  worker:
+    image: ghcr.io/tarekmodev/jenova:${JENOVA_TAG:-latest}
+    command: ["pnpm", "--filter", "@jenova/worker", "start"]
+    env_file: /opt/jenova/.env
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+    depends_on:
+      - redis
+
+  # Redis lives on the VM (containerized) instead of ElastiCache — see
+  # infra/README.md for the cost rationale. Not exposed on any host port:
+  # only api/worker reach it over the compose network (redis://redis:6379).
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    restart: unless-stopped
+
+volumes:
+  redisdata:
