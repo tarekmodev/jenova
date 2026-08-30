@@ -16,3 +16,23 @@ export {
   equals,
   isZero,
 } from "./money";
+
+export {
+  type TenantId,
+  type SubTenantId,
+  InvalidIdError,
+  tenantId,
+  subTenantId,
+  SALES_CHANNELS,
+  type SalesChannel,
+  APP_KEYS,
+  type AppKey,
+  VERTICALS,
+  type Vertical,
+  LOCALES,
+  type Locale,
+  isSalesChannel,
+  isAppKey,
+  isVertical,
+  isLocale,
+} from "./tenancy";

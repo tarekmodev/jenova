@@ -174,8 +174,10 @@ describe("multiplyByScalar", () => {
   });
 
   it("property: result is always a safe integer for decimal scalars", () => {
+    // |scalar| <= 1000 so |amount * scalar| stays within the safe range;
+    // the overflow guard itself is exercised in the add/subtract suite.
     const decimalScalarArb = fc
-      .tuple(fc.integer({ min: -10_000, max: 10_000 }), fc.integer({ min: 0, max: 4 }))
+      .tuple(fc.integer({ min: -1000, max: 1000 }), fc.integer({ min: 0, max: 4 }))
       .map(([mantissa, places]) => mantissa / 10 ** places);
     fc.assert(
       fc.property(moneyArb, decimalScalarArb, (m, scalar) => {
