@@ -22,7 +22,7 @@ test it, and ship a reviewed PR to staging — unaided.
       contract-test harness skeleton.
 - [ ] `sandbox-replay` package: recording proxy (fingerprint keying, auth sanitization),
       replay resolver, "record this scenario first" failure mode.
-- [ ] `apps/api` skeleton: NestJS bootstrap, gateway middleware chain stubs
+- [x] `apps/api` skeleton: NestJS bootstrap, gateway middleware chain stubs
       (host→tenant resolution, auth realm stub, entitlement check stub), health/ready.
 - [ ] Auth skeleton: session issuance/verification per realm, TOTP enrollment (full
       flows land with their apps).

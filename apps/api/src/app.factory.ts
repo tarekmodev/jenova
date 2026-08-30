@@ -6,11 +6,17 @@
 import type { INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { API_CONFIG, type ApiConfig } from "./config/config";
+import { requestContextMiddleware } from "./gateway/request-context.middleware";
+import { HTTP_SERVER_HOOKS, type HttpServerHooks } from "./observability/instrumentation";
 
 export const OPENAPI_PATH = "openapi";
 
 export function configureApp(app: INestApplication): ApiConfig {
   const config = app.get<ApiConfig>(API_CONFIG);
+
+  // Ahead of routing: every response (including 404s and gateway rejections)
+  // carries x-request-id, and the RequestContext exists before any stage runs.
+  app.use(requestContextMiddleware(app.get<HttpServerHooks>(HTTP_SERVER_HOOKS)));
 
   // Graceful shutdown: SIGTERM/SIGINT close the HTTP server and run module
   // lifecycle hooks (onModuleDestroy/onApplicationShutdown) before exit.

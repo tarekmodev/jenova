@@ -1,8 +1,10 @@
 import { Controller, Get, Inject, ServiceUnavailableException } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { SkipGateway } from "../gateway/decorators";
 import { READINESS_CHECKS, type ReadinessCheck } from "./readiness";
 
 @ApiTags("platform")
+@SkipGateway() // Probes exist below tenancy — no Host→tenant resolution.
 @Controller()
 export class HealthController {
   constructor(
