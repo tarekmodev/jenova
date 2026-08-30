@@ -14,9 +14,10 @@ import { GatewayModule } from "./gateway/gateway.module";
 import { HealthController } from "./health/health.controller";
 import { READINESS_CHECKS } from "./health/readiness";
 import { HTTP_SERVER_HOOKS, noopHttpServerHooks } from "./observability/instrumentation";
+import { SupplierRegistryModule } from "./supplier-registry";
 
 @Module({
-  imports: [GatewayModule],
+  imports: [GatewayModule, SupplierRegistryModule],
   controllers: [HealthController],
   providers: [
     {

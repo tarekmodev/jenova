@@ -42,6 +42,8 @@ export {
   createSupplierHttpClient,
 } from "./transport";
 
+export { type FetchFn, createFetchTransport } from "./fetch-transport";
+
 export {
   type JsonCodecOptions,
   formatZodIssues,

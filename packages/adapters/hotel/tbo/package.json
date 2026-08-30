@@ -3,11 +3,23 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run",
+    "record": "tsx tools/record.ts"
+  },
+  "dependencies": {
+    "@jenova/domain": "workspace:*",
+    "@jenova/sandbox-replay": "workspace:*",
+    "@jenova/supplier-sdk": "workspace:*",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@types/node": "^22.18.0",
+    "tsx": "^4.20.0",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
