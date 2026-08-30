@@ -50,8 +50,8 @@ import {
   type BookingItemRow,
   type BookingRow,
 } from "@jenova/booking-engine";
-import { bookingItems, bookings, type TenantDbResolver } from "@jenova/db";
-import { eq } from "drizzle-orm";
+import { auditEvents, bookingItems, bookings, type TenantDbResolver } from "@jenova/db";
+import { and, desc, eq } from "drizzle-orm";
 import type { SupplierCredentialsSource, SupplierRegistry } from "@jenova/supplier-registry";
 import { OfferError, SupplierUnavailableError } from "../offers/errors";
 import type { OffersService, VerifiedOffer } from "../offers/offers.service";
@@ -92,6 +92,33 @@ export interface CancellationPreview {
   readonly refund: Money | null;
   readonly refundable: boolean;
   readonly asOf: Date;
+}
+
+export interface BookingListEntry {
+  readonly bookingId: string;
+  readonly clientReference: string;
+  readonly createdAt: Date;
+  readonly state: BookingItemState;
+  readonly supplierCode: string;
+  readonly supplierReference: string | null;
+  readonly sell: Money;
+  readonly escalated: boolean;
+  readonly cancellationRequestedAt: Date | null;
+}
+
+export interface BookingHistoryEntry {
+  readonly action: string;
+  readonly fromState: string | null;
+  readonly toState: string | null;
+  readonly occurredAt: Date;
+}
+
+/** Extracts a state string from an audit before/after snapshot, if present. */
+function stateOf(snapshot: Record<string, unknown> | null): string | null {
+  if (snapshot !== null && typeof snapshot["state"] === "string") {
+    return snapshot["state"];
+  }
+  return null;
 }
 
 export type CancelBookingStatus = "cancelled" | "cancellation_pending";
@@ -442,6 +469,72 @@ export class HotelBookingService {
     scope: Pick<CallScope, "subTenantId">,
   ): Promise<{ booking: BookingRow; item: BookingItemRow }> {
     return this.loadScoped(tenant, bookingId, scope.subTenantId);
+  }
+
+  /**
+   * Agency-scoped booking list (M2 issue #98). Reads booking + single item
+   * rows only — amounts are the persisted sell figures, never recomputed
+   * (financial REPORTS stay ledger reads; this is operational state).
+   */
+  async listBookings(
+    tenant: TenantId,
+    scope: Pick<CallScope, "subTenantId">,
+    limit = 100,
+  ): Promise<readonly BookingListEntry[]> {
+    if (scope.subTenantId === null) {
+      // The agency realm always carries a sub-tenant scope; an unscoped
+      // caller has no agency booking list to see.
+      return [];
+    }
+    const db = await this.resolver.getTenantDb(tenant);
+    const rows = await db
+      .select({ booking: bookings, item: bookingItems })
+      .from(bookings)
+      .innerJoin(bookingItems, eq(bookingItems.bookingId, bookings.id))
+      .where(eq(bookings.agencyId, scope.subTenantId))
+      .orderBy(desc(bookings.createdAt))
+      .limit(Math.min(500, Math.max(1, limit)));
+    return rows.map(({ booking, item }) => ({
+      bookingId: booking.id,
+      clientReference: booking.clientReference,
+      createdAt: booking.createdAt,
+      state: item.state,
+      supplierCode: item.supplierCode,
+      supplierReference: item.supplierReference,
+      sell: { amount: moneyAmountFrom(item.sellAmount, "sell_amount"), currency: item.currency },
+      escalated: item.escalatedAt !== null,
+      cancellationRequestedAt: item.cancellationRequestedAt,
+    }));
+  }
+
+  /**
+   * State history for one booking item, read from the append-only audit
+   * trail (booking_item.transition events) — the same source of truth the
+   * dashboard's audit views read; never reconstructed from current state.
+   */
+  async getBookingHistory(
+    tenant: TenantId,
+    bookingId: string,
+    scope: Pick<CallScope, "subTenantId">,
+  ): Promise<readonly BookingHistoryEntry[]> {
+    const { item } = await this.loadScoped(tenant, bookingId, scope.subTenantId);
+    const db = await this.resolver.getTenantDb(tenant);
+    const rows = await db
+      .select({
+        action: auditEvents.action,
+        before: auditEvents.before,
+        after: auditEvents.after,
+        occurredAt: auditEvents.occurredAt,
+      })
+      .from(auditEvents)
+      .where(and(eq(auditEvents.entityType, "booking_item"), eq(auditEvents.entityId, item.id)))
+      .orderBy(auditEvents.id);
+    return rows.map((row) => ({
+      action: row.action,
+      fromState: stateOf(row.before),
+      toState: stateOf(row.after),
+      occurredAt: row.occurredAt,
+    }));
   }
 
   // -------------------------------------------------------------------------
