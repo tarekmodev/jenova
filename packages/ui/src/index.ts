@@ -75,6 +75,49 @@ export {
   type LoadingStateProps,
 } from "./shell/StatusStates";
 
+// Domain widgets
+export { MoneyText, type MoneyTextProps } from "./widgets/MoneyText";
+export {
+  formatMoney,
+  currencyFractionDigits,
+  minorUnitsToDecimalString,
+  type FormatMoneyOptions,
+  type NumeralSystem,
+} from "./widgets/formatMoney";
+export { DateText, type DateTextProps } from "./widgets/DateText";
+export { formatGregorian, formatHijri, type FormatDateOptions } from "./widgets/formatDate";
+export { BookingStateChip, type BookingStateChipProps } from "./widgets/BookingStateChip";
+export {
+  bookingStateAppearance,
+  ESCALATED_APPEARANCE,
+  type BookingStateAppearance,
+  type ChipTone,
+} from "./widgets/bookingStateAppearance";
+export {
+  StreamingList,
+  type StreamingListProps,
+  type StreamingListLabels,
+} from "./widgets/StreamingList";
+export {
+  initialStreamingListState,
+  streamingListReducer,
+  type StreamLane,
+  type StreamLaneStatus,
+  type StreamCompletion,
+  type StreamingListState,
+  type StreamingListEvent,
+} from "./widgets/streaming";
+export {
+  PolicyTimeline,
+  type PolicyTimelineProps,
+  type PolicyTimelineLabels,
+} from "./widgets/PolicyTimeline";
+export {
+  computePolicyTimeline,
+  type PolicyTimeline as PolicyTimelineData,
+  type PolicyTimelineSegment,
+} from "./widgets/policyTimelineModel";
+
 // Curated MUI re-exports — the wrapper surface for dashboard-class apps.
 // Layout & structure
 export {
