@@ -148,6 +148,13 @@ describe("multiplyByScalar", () => {
     expect(multiplyByScalar(money(1234, "SAR"), 0)).toEqual(money(0, "SAR"));
   });
 
+  it("never produces or stores negative zero", () => {
+    expect(Object.is(multiplyByScalar(money(0, "SAR"), -1).amount, 0)).toBe(true);
+    expect(Object.is(multiplyByScalar(money(-5, "SAR"), 0).amount, 0)).toBe(true);
+    expect(Object.is(money(-0, "SAR").amount, 0)).toBe(true);
+    expect(Object.is(add(money(-3, "SAR"), money(3, "SAR")).amount, 0)).toBe(true);
+  });
+
   it("rounds half away from zero, symmetrically for negative amounts", () => {
     expect(multiplyByScalar(money(5, "SAR"), 0.5)).toEqual(money(3, "SAR")); // 2.5 -> 3
     expect(multiplyByScalar(money(-5, "SAR"), 0.5)).toEqual(money(-3, "SAR")); // -2.5 -> -3
@@ -250,7 +257,8 @@ describe("compare", () => {
   it("property: compare is a total order consistent with amounts", () => {
     fc.assert(
       fc.property(sameCurrencyPairArb, ([a, b]) => {
-        expect(compare(a, b)).toBe(-compare(b, a));
+        // 0 - x instead of -x: negating 0 yields -0, which toBe (Object.is) distinguishes
+        expect(compare(a, b)).toBe(0 - compare(b, a));
         expect(compare(a, b) === 0).toBe(a.amount === b.amount);
         expect(equals(a, a)).toBe(true);
       }),
