@@ -6,6 +6,8 @@ import { ApiConfigError, loadApiConfig } from "./config";
 const validEnv = {
   CONTROL_PLANE_DATABASE_URL: "postgres://jenova:jenova@localhost:5432/jenova_control_plane",
   REDIS_URL: "redis://localhost:6379",
+  JENOVA_TENANT_RUNTIME_DSN: "postgres://jenova_app:jenova_app@localhost:5432/postgres",
+  OFFER_SIGNING_KEY: "dev-only-offer-signing-key-change-me-0000",
 };
 
 describe("loadApiConfig", () => {
@@ -16,6 +18,8 @@ describe("loadApiConfig", () => {
       port: 3000,
       controlPlaneDatabaseUrl: validEnv.CONTROL_PLANE_DATABASE_URL,
       redisUrl: validEnv.REDIS_URL,
+      tenantRuntimeDsn: validEnv.JENOVA_TENANT_RUNTIME_DSN,
+      offerSigningKey: validEnv.OFFER_SIGNING_KEY,
     });
     expect(Object.isFrozen(config)).toBe(true);
   });
@@ -48,6 +52,15 @@ describe("loadApiConfig", () => {
     expect(() => loadApiConfig({ ...validEnv, API_PORT: "0" })).toThrowError(ApiConfigError);
     expect(() => loadApiConfig({ ...validEnv, API_PORT: "70000" })).toThrowError(ApiConfigError);
     expect(() => loadApiConfig({ ...validEnv, API_PORT: "http" })).toThrowError(ApiConfigError);
+  });
+
+  it("rejects an offer signing key shorter than 32 characters", () => {
+    expect(() => loadApiConfig({ ...validEnv, OFFER_SIGNING_KEY: "short" })).toThrowError(
+      ApiConfigError,
+    );
+    expect(() => loadApiConfig({ ...validEnv, OFFER_SIGNING_KEY: "short" })).toThrowError(
+      /OFFER_SIGNING_KEY/,
+    );
   });
 
   it("rejects an unknown NODE_ENV", () => {

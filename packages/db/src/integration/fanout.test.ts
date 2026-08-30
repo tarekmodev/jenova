@@ -25,6 +25,7 @@ const available = await pgAvailable();
 describe.skipIf(!available)("fan-out migration runner", () => {
   let platform: TestPlatform;
   let migrationsDir: string;
+  let probeName: string;
   const slugs: string[] = [];
   const dbNames: string[] = [];
 
@@ -33,9 +34,14 @@ describe.skipIf(!available)("fan-out migration runner", () => {
 
     // A copy of the packaged tenant migrations we can extend with a second wave.
     migrationsDir = await mkdtemp(path.join(tmpdir(), "jenova-db-fanout-"));
-    for (const file of await loadMigrationDir(TENANT_MIGRATIONS_DIR)) {
+    const packaged = await loadMigrationDir(TENANT_MIGRATIONS_DIR);
+    for (const file of packaged) {
       await writeFile(path.join(migrationsDir, file.name), file.sql);
     }
+    // The probe takes the next free number, so newly packaged tenant
+    // migrations never collide with it.
+    const highest = Math.max(...packaged.map((file) => Number(file.name.slice(0, 4))));
+    probeName = `${String(highest + 1).padStart(4, "0")}_fanout_probe.sql`;
 
     for (const prefix of ["fa", "fb", "fc"]) {
       const slug = `${prefix}_${platform.suffix}`;
@@ -60,7 +66,7 @@ describe.skipIf(!available)("fan-out migration runner", () => {
 
   it("isolates a failing tenant, reports per-tenant status, and resumes on re-run", async () => {
     // Second wave: pure schema, applies everywhere.
-    await writeFile(path.join(migrationsDir, "0003_fanout_probe.sql"), "create table fanout_probe (id int primary key);\n");
+    await writeFile(path.join(migrationsDir, probeName), "create table fanout_probe (id int primary key);\n");
 
     // Sabotage tenant fb only: a conflicting object makes 0002 fail there.
     const brokenDb = dbNames[1];
@@ -74,7 +80,7 @@ describe.skipIf(!available)("fan-out migration runner", () => {
     expect(dry.controlPlane.pending).toEqual([]);
     expect(dry.tenants).toHaveLength(3);
     for (const tenant of dry.tenants) {
-      expect(tenant.pending).toEqual(["0003_fanout_probe.sql"]);
+      expect(tenant.pending).toEqual([probeName]);
       expect(tenant.applied).toEqual([]);
     }
 
@@ -83,12 +89,12 @@ describe.skipIf(!available)("fan-out migration runner", () => {
     expect(apply.ok).toBe(false);
     const bySlug = new Map(apply.tenants.map((t) => [t.slug, t]));
     expect(bySlug.get(slugs[0] ?? "")?.status).toBe("ok");
-    expect(bySlug.get(slugs[0] ?? "")?.applied).toEqual(["0003_fanout_probe.sql"]);
+    expect(bySlug.get(slugs[0] ?? "")?.applied).toEqual([probeName]);
     expect(bySlug.get(slugs[2] ?? "")?.status).toBe("ok");
     const failed = bySlug.get(slugs[1] ?? "");
     expect(failed?.status).toBe("failed");
     expect(failed?.error).toMatch(/fanout_probe/);
-    expect(failed?.pending).toEqual(["0003_fanout_probe.sql"]);
+    expect(failed?.pending).toEqual([probeName]);
 
     // Fix fb and re-run: only fb has work left; the others are recorded as done.
     await broken.unsafe("drop table fanout_probe");
@@ -96,7 +102,7 @@ describe.skipIf(!available)("fan-out migration runner", () => {
     const resume = await runFanout(platform.controlPlane, { mode: "apply", tenantMigrationsDir: migrationsDir });
     expect(resume.ok).toBe(true);
     const resumed = new Map(resume.tenants.map((t) => [t.slug, t]));
-    expect(resumed.get(slugs[1] ?? "")?.applied).toEqual(["0003_fanout_probe.sql"]);
+    expect(resumed.get(slugs[1] ?? "")?.applied).toEqual([probeName]);
     expect(resumed.get(slugs[0] ?? "")?.applied).toEqual([]);
     expect(resumed.get(slugs[2] ?? "")?.applied).toEqual([]);
 
@@ -122,7 +128,7 @@ describe.skipIf(!available)("fan-out migration runner", () => {
   it("refuses edited (checksum-changed) applied migrations", async () => {
     const dbName = dbNames[0];
     if (dbName === undefined) throw new Error("setup did not provision tenants");
-    await writeFile(path.join(migrationsDir, "0003_fanout_probe.sql"), "-- edited after apply\nselect 1;\n");
+    await writeFile(path.join(migrationsDir, probeName), "-- edited after apply\nselect 1;\n");
     const sql = connectTenant(dbName);
     try {
       await expect(applyMigrations(sql, await loadMigrationDir(migrationsDir))).rejects.toThrow(
@@ -131,7 +137,7 @@ describe.skipIf(!available)("fan-out migration runner", () => {
     } finally {
       await sql.end({ timeout: 1 });
       // restore so later fan-outs in this file (if any) see consistent content
-      await writeFile(path.join(migrationsDir, "0003_fanout_probe.sql"), "create table fanout_probe (id int primary key);\n");
+      await writeFile(path.join(migrationsDir, probeName), "create table fanout_probe (id int primary key);\n");
     }
   });
 });

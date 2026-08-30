@@ -39,6 +39,7 @@ export {
   type LedgerAccountType,
   AUDIT_ACTOR_TYPES,
   type AuditActorType,
+  type OfferRoomOccupancy,
   supplierAccounts,
   agencies,
   agencyUsers,

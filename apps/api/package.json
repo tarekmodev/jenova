@@ -12,11 +12,13 @@
   "dependencies": {
     "@jenova/db": "workspace:*",
     "@jenova/domain": "workspace:*",
+    "@jenova/supplier-sdk": "workspace:*",
     "@nestjs/common": "^11.1.6",
     "@nestjs/core": "^11.1.6",
     "@nestjs/platform-express": "^11.1.6",
     "@nestjs/swagger": "^11.2.0",
     "argon2": "0.45.1",
+    "drizzle-orm": "^0.45.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "zod": "^4.1.12"

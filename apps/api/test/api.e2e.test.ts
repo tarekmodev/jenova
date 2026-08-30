@@ -19,6 +19,8 @@ const testConfig: ApiConfig = Object.freeze({
   port: 0,
   controlPlaneDatabaseUrl: "postgres://jenova:jenova@localhost:5432/jenova_control_plane",
   redisUrl: "redis://localhost:6379",
+  tenantRuntimeDsn: "postgres://jenova_app:jenova_app@localhost:5432/postgres",
+  offerSigningKey: "dev-only-offer-signing-key-change-me-0000",
 });
 
 const KNOWN_HOST = "tenant-one.example.test";
