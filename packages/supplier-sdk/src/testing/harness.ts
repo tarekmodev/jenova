@@ -107,6 +107,13 @@ export async function expectSupplierErrorKind(
  */
 export interface HotelHappyPathScenario {
   readonly query: HotelSearchQuery;
+  /**
+   * Which searched offer the lifecycle books. Defaults to the first offer;
+   * real certifications pick deliberately (a cheap refundable rate whose
+   * free-cancellation window is open) so the live run books something that
+   * can be cancelled at no charge.
+   */
+  readonly pickOffer?: (offers: readonly HotelOffer[]) => HotelOffer;
   readonly makeBookRequest: (checkedOffer: HotelOffer) => HotelBookRequest;
 }
 
@@ -168,12 +175,12 @@ export function describeHotelAdapterContract(
       it("check revalidates an offer into a bookable rate", async () => {
         const ctx = makeContext();
         const offers = await adapter.search(ctx, happyPath.query);
-        const first = offers[0];
-        expect(first).toBeDefined();
-        if (first === undefined) {
+        const picked = (happyPath.pickOffer ?? ((all) => all[0]))(offers);
+        expect(picked).toBeDefined();
+        if (picked === undefined) {
           return;
         }
-        checkedOffer = await adapter.check(ctx, first.supplierOfferToken);
+        checkedOffer = await adapter.check(ctx, picked.supplierOfferToken);
         assertHotelOffer(checkedOffer, ctx);
       });
 

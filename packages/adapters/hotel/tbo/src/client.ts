@@ -35,7 +35,8 @@ export type TboEndpoint =
   | "countryList"
   | "cityList"
   | "hotelCodeList"
-  | "hotelDetails";
+  | "hotelDetails"
+  | "bookingDetailsBasedOnDate";
 
 interface EndpointSpec {
   readonly path: string;
@@ -57,6 +58,11 @@ export const TBO_ENDPOINTS: Readonly<Record<TboEndpoint, EndpointSpec>> = {
   countryList: { path: "CountryList", method: "GET", idempotent: true },
   cityList: { path: "CityList", method: "POST", idempotent: true },
   hotelCodeList: { path: "TBOHotelCodeList", method: "POST", idempotent: true },
+  bookingDetailsBasedOnDate: {
+    path: "BookingDetailsBasedOnDate",
+    method: "POST",
+    idempotent: true,
+  },
   hotelDetails: { path: "HotelDetails", method: "POST", idempotent: true },
 };
 

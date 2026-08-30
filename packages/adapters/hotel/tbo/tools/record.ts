@@ -81,6 +81,10 @@ async function main(): Promise<void> {
         { password: process.env["TBO_HOTEL_SCRATCH_PASSWORD"] ?? "jenova-wrong-password-probe" },
       );
     }
+    case "bookingsOnDate":
+      // Ops helper: list sandbox bookings created on a date, to verify no
+      // orphaned reservations are left behind by interrupted runs.
+      return call("bookingDetailsBasedOnDate", { FromDate: args[0], ToDate: args[1] ?? args[0] });
     case "cancelRaw":
       return call("cancel", { ConfirmationNumber: args[0] });
     case "search": {

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 2,
+  "supplier": "tbo",
+  "fingerprint": "post-api-tbotechnology-in-tboholidays-hotelapi-prebook-461a051014b5",
+  "request": {
+    "method": "POST",
+    "url": "https://api.tbotechnology.in/TBOHolidays_HotelAPI/PreBook",
+    "headers": {
+      "accept": "application/json",
+      "authorization": "[REDACTED]",
+      "content-type": "application/json"
+    },
+    "body": "{\"BookingCode\":\"1065918!TB!1!TB!ffffffff-ffff-ffff-ffff-ffffffffffff!TB!N!TB!AFF!\",\"PaymentMode\":\"Limit\"}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "keep-alive",
+      "content-length": "72",
+      "content-type": "application/json",
+      "date": "Sun, 30 Aug 2026 16:30:45 GMT",
+      "sessionid": "[REDACTED]"
+    },
+    "body": "{\"Status\":{\"Code\":315,\"Description\":\"Session Expired or doesn't exist\"}}"
+  },
+  "timings": {
+    "durationMs": 314
+  }
+}

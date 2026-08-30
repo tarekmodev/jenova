@@ -26,6 +26,8 @@ export const TBO_STATUS_NO_ROOMS = 201;
  * sandbox failures (each code's recording is committed; the full observed
  * catalogue is the README's taxonomy table):
  *   201 "No Available rooms for given criteria"            → sold_out
+ *   315 "Session Expired or doesn't exist" (dead/expired
+ *       BookingCode on PreBook)                            → price_changed
  *   400 "Invalid date entered. CheckIn date should be…"    → invalid_request
  *   400 "Booking does not exist for the requested input"   → invalid_request
  *   401 "Access Credentials is incorrect" (HTTP 200!)      → auth_failed
@@ -36,6 +38,8 @@ export const TBO_STATUS_NO_ROOMS = 201;
  */
 const STATUS_KIND: ReadonlyMap<number, SupplierErrorKind> = new Map([
   [TBO_STATUS_NO_ROOMS, "sold_out"],
+  // The rate token behind the offer is gone — the offer must be re-priced.
+  [315, "price_changed"],
   [400, "invalid_request"],
   [401, "auth_failed"],
   [403, "auth_failed"],

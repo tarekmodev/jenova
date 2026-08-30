@@ -9,7 +9,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "record": "tsx tools/record.ts"
+    "record": "tsx tools/record.ts",
+    "certify": "tsx tools/certify.ts"
   },
   "dependencies": {
     "@jenova/domain": "workspace:*",

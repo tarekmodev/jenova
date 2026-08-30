@@ -17,6 +17,7 @@ import type {
   HotelOffer,
   HotelSearchQuery,
 } from "@jenova/supplier-sdk";
+import { encodeOfferToken, type TboOfferTokenV1 } from "./mapping";
 
 /** Riyadh hotel codes drawn from the recorded TBOHotelCodeList response. */
 export const RECORDED_RIYADH_HOTEL_CODES = [
@@ -41,6 +42,13 @@ export const RECORDED_SEARCH_QUERY: HotelSearchQuery = {
   checkOut: "2026-10-14",
   rooms: [{ adults: 1, childAges: [] }],
 };
+
+/**
+ * When the lifecycle session ran against the live sandbox. Offer selection
+ * over the recordings evaluates cancellation windows at this instant so
+ * replay stays deterministic regardless of when the tests run.
+ */
+export const RECORDED_SEARCH_INSTANT = "2026-08-30T16:00:00Z";
 
 /**
  * The client reference of the recorded certification booking. TBO receives
@@ -80,6 +88,52 @@ export function makeRecordedBookRequest(checkedOffer: HotelOffer): HotelBookRequ
  */
 export const RECORDED_EXPIRED_BOOKING_CODE =
   "1065918!TB!1!TB!6acadf51-a48b-11f1-a512-aa71e0cecaa6!TB!N!TB!AFF!";
+
+/**
+ * Offer token wrapping the expired BookingCode; the snapshot fields mirror
+ * the rate as it was priced when the code was minted. check() on it replays
+ * (or reproduces live) TBO's 201 → sold_out.
+ */
+export function makeExpiredOfferToken(): string {
+  const token: TboOfferTokenV1 = {
+    v: 1,
+    bookingCode: RECORDED_EXPIRED_BOOKING_CODE,
+    hotelCode: "1065918",
+    currency: "USD",
+    totalFare: 139.73,
+    roomName: "Studio,2 Twin Beds",
+    boardBasis: "RO",
+    refundable: true,
+    policy: { refundable: true, rules: [] },
+    nationality: "SA",
+  };
+  return encodeOfferToken(token);
+}
+
+/**
+ * A syntactically valid BookingCode whose rate GUID never existed: TBO
+ * answers 315 "Session Expired or doesn't exist" (recorded) — the
+ * deterministic dead/expired-token failure, mapped to price_changed.
+ */
+export const RECORDED_DEAD_BOOKING_CODE =
+  "1065918!TB!1!TB!ffffffff-ffff-ffff-ffff-ffffffffffff!TB!N!TB!AFF!";
+
+/** Offer token wrapping {@link RECORDED_DEAD_BOOKING_CODE}. */
+export function makeDeadRateOfferToken(): string {
+  const token: TboOfferTokenV1 = {
+    v: 1,
+    bookingCode: RECORDED_DEAD_BOOKING_CODE,
+    hotelCode: "1065918",
+    currency: "USD",
+    totalFare: 139.73,
+    roomName: "Studio,2 Twin Beds",
+    boardBasis: "RO",
+    refundable: true,
+    policy: { refundable: true, rules: [] },
+    nationality: "SA",
+  };
+  return encodeOfferToken(token);
+}
 
 /** CheckOut before CheckIn → Status 400 "Invalid date entered…" (recorded). */
 export const RECORDED_INVALID_DATES_QUERY: HotelSearchQuery = {

@@ -5,10 +5,13 @@ sandbox** (first supplier from Tarek's credentials list — assumed TBO), with r
 recorded traffic powering CI. No UI yet beyond API endpoints.
 
 ## Deliverables
-- [ ] **First hotel adapter** (`adapters/hotel/tbo`): auth, search, check, book,
+- [x] **First hotel adapter** (`adapters/hotel/tbo`): auth, search, check, book,
       retrieve, cancel against the live sandbox; full normalization (Money, UTC policy
       deadlines, occupancy, board basis, error taxonomy); recordings captured for every
       scenario the sandbox can produce (ok, sold_out, price_changed, timeout).
+      (#49: full lifecycle proven live — booking LVFXI5 booked and cancelled;
+      rate_limited unreachable without violating look-to-book, documented in the
+      adapter README.)
 - [ ] **Search & availability service** (`api/hotel-search`): fan-out orchestrator
       (single supplier for now, N-ready), hard time budget, SSE streaming, availability
       cache keyed (supplier, property, dates, occupancy, nationality), static-content
@@ -26,8 +29,9 @@ recorded traffic powering CI. No UI yet beyond API endpoints.
 - [ ] **Ledger core** (`api/ledger`): double-entry postings for reserve/confirm/cancel;
       balance reads; the ledger-invariant checker (debits=credits) wired into tests.
 - [ ] Worker app: BullMQ queues for supplier retries + pending-confirmation polling.
-- [ ] Contract-test suite v1 in supplier-sdk: the generic suite every hotel adapter must
-      pass — runs on recordings in CI, and live pre-certification.
+- [x] Contract-test suite v1 in supplier-sdk: the generic suite every hotel adapter must
+      pass — runs on recordings in CI, and live pre-certification. (Proven both modes
+      on the TBO adapter; run report: `docs/certification/tbo.md`.)
 
 ## Agent workstreams
 1. **adapter-tbo** (with recordings) — the pathfinder; its friction refines supplier-sdk.

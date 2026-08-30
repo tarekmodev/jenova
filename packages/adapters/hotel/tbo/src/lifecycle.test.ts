@@ -16,6 +16,7 @@ import {
   makeRecordedBookRequest,
   pickLifecycleOffer,
   RECORDED_CLIENT_REFERENCE,
+  RECORDED_SEARCH_INSTANT,
   RECORDED_SEARCH_QUERY,
 } from "./recorded-scenarios";
 import { makeTestContext } from "./test-context";
@@ -31,7 +32,7 @@ function makeAdapter() {
 async function searchAndPick(): Promise<HotelOffer> {
   const adapter = makeAdapter();
   const offers = await adapter.search(makeTestContext(), RECORDED_SEARCH_QUERY);
-  return pickLifecycleOffer(offers, new Date("2026-08-30T16:00:00Z"));
+  return pickLifecycleOffer(offers, new Date(RECORDED_SEARCH_INSTANT));
 }
 
 describe("TBO check (PreBook)", () => {

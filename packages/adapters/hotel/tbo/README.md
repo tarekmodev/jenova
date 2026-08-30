@@ -47,7 +47,8 @@ the live sandbox on 2026-08-30:
 |------------|----------------------|-------------|-------------------|
 | Status 200 | `Success` / `Successful` | (ok) | every happy-path recording |
 | Status 201 on `search` | `No Available rooms for given criteria` | **empty result** `[]` | unknown hotel code 999999999 |
-| Status 201 on `PreBook` | `No Available rooms for given criteria` | `sold_out` | expired BookingCode (TBO does not distinguish expiry from sold-out) |
+| Status 201 on `PreBook` | `No Available rooms for given criteria` | `sold_out` | expired BookingCode (TBO does not distinguish expiry from sold-out; the sandbox intermittently RE-VALIDATES old codes, so this scenario is recorded-only in the contract suite — live it appears as a todo) |
+| Status 315 | `Session Expired or doesn't exist` | `price_changed` | PreBook of a dead rate GUID — the priced offer is gone and must be re-priced (deterministic live and recorded) |
 | Status 400 | `Invalid date entered. CheckIn date should be less than CheckOut date.` | `invalid_request` | reversed date range |
 | Status 400 | `Booking does not exist for the requested input` | `invalid_request` | BookingDetail for unknown confirmation |
 | Status 401 | `Access Credentials is incorrect` (HTTP 200!) | `auth_failed` | wrong password via scratch env var (`TBO_HOTEL_SCRATCH_PASSWORD`; `.env` untouched) |

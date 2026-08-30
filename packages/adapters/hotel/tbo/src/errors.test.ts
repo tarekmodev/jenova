@@ -7,10 +7,9 @@
 import { describe, expect, it } from "vitest";
 import { expectSupplierErrorKind } from "@jenova/supplier-sdk/testing";
 import { createTboHotelAdapter } from "./adapter";
-import { encodeOfferToken, type TboOfferTokenV1 } from "./mapping";
 import {
+  makeExpiredOfferToken,
   RECORDED_BAD_AUTH_QUERY,
-  RECORDED_EXPIRED_BOOKING_CODE,
   RECORDED_INVALID_DATES_QUERY,
   RECORDED_SEARCH_QUERY,
   RECORDED_UNKNOWN_CONFIRMATION,
@@ -23,27 +22,10 @@ function makeAdapter() {
   return createTboHotelAdapter({ transport: createTboTransport({ mode: "replay" }) });
 }
 
-/** Token wrapping the expired BookingCode (snapshot values are our own). */
-function expiredOfferToken(): string {
-  const token: TboOfferTokenV1 = {
-    v: 1,
-    bookingCode: RECORDED_EXPIRED_BOOKING_CODE,
-    hotelCode: "1065918",
-    currency: "USD",
-    totalFare: 139.73,
-    roomName: "Studio,2 Twin Beds",
-    boardBasis: "RO",
-    refundable: true,
-    policy: { refundable: true, rules: [] },
-    nationality: "SA",
-  };
-  return encodeOfferToken(token);
-}
-
 describe("TBO error taxonomy from recorded sandbox failures", () => {
   it("sold_out: PreBook of an expired BookingCode (TBO 201, indistinguishable from sold-out)", async () => {
     await expectSupplierErrorKind(
-      () => makeAdapter().check(makeTestContext(), expiredOfferToken()),
+      () => makeAdapter().check(makeTestContext(), makeExpiredOfferToken()),
       "sold_out",
     );
   });
