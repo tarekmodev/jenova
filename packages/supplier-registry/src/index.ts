@@ -1,8 +1,14 @@
 /**
  * Supplier registry (CLAUDE.md rule 4): THE ONLY place in the engine that
  * may import adapter packages — the ESLint boundary config carves exactly
- * this directory out for that. Everything else speaks the canonical
+ * this package out for that, and only the two engine processes (api,
+ * worker) may import IT. Everything else speaks the canonical
  * @jenova/supplier-sdk contracts and @jenova/domain types.
+ *
+ * Moved from apps/api/src/supplier-registry in M1 (issues #67/#68): the
+ * worker's pending-confirmation poller retrieves bookings through the same
+ * registry, and apps may only import shared packages — never other apps
+ * (docs/07-tech-stack.md).
  *
  * M1: the TBO hotel adapter is registered here. Transport wiring follows
  * NODE_ENV (docs/09-testing.md): production=live, development=record
@@ -18,10 +24,13 @@ import {
 } from "@jenova/adapter-hotel-tbo";
 import type { SupplierAccountCredentials, HotelSupplierAdapter } from "@jenova/supplier-sdk";
 import type { TenantId } from "@jenova/domain";
-import { NODE_ENVS, type NodeEnv } from "../config/config";
 
 /** Nest injection token for the process-wide {@link SupplierRegistry}. */
 export const SUPPLIER_REGISTRY = Symbol("jenova.api.supplierRegistry");
+
+/** Mirrors the api/worker config NodeEnv values (docs/09-testing.md). */
+const NODE_ENVS = ["development", "test", "production"] as const;
+type NodeEnv = (typeof NODE_ENVS)[number];
 
 export type SupplierTransportMode = "live" | "record" | "replay";
 
@@ -138,5 +147,42 @@ export class UnboundSupplierCredentialsSource implements SupplierCredentialsSour
           "the supplier_account decryption wiring has not landed yet",
       ),
     );
+  }
+}
+
+/**
+ * DEVELOPMENT-ONLY credentials seam: the repo-root `.env` supplier blocks
+ * (Tarek's sandbox test-credentials list) stand in for the tenant's own
+ * supplier_account row until the encrypted secret-store wiring lands. The
+ * values are REAL sandbox credentials — nothing here fabricates anything —
+ * and this source refuses to run outside development. Wired only when
+ * NODE_ENV=development; production/test keep Unbound / replay respectively.
+ */
+export class EnvSupplierCredentialsSource implements SupplierCredentialsSource {
+  constructor(private readonly env: Readonly<Record<string, string | undefined>> = process.env) {}
+
+  credentialsFor(tenant: TenantId, supplierCode: string): Promise<SupplierAccountCredentials> {
+    if (supplierCode !== TBO_SUPPLIER_CODE) {
+      return Promise.reject(
+        new Error(`no development credentials mapping for supplier ${supplierCode}`),
+      );
+    }
+    const require = (name: string): string => {
+      const value = this.env[name];
+      if (value === undefined || value.trim() === "") {
+        throw new Error(`${name} is not set — fill the TBO block in the repo-root .env first`);
+      }
+      return value;
+    };
+    return Promise.resolve({
+      tenantId: tenant,
+      supplierCode,
+      environment: "sandbox",
+      secrets: {
+        apiUrl: require("TBO_HOTEL_API_URL"),
+        username: require("TBO_HOTEL_USERNAME"),
+        password: require("TBO_HOTEL_PASSWORD"),
+      },
+    });
   }
 }
