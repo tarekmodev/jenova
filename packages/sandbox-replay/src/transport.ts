@@ -170,8 +170,12 @@ export function createReplayTransport(config: ReplayTransportConfig): FetchLike 
     );
     await writeRecordingFile(recordingsDir, recording);
 
-    // Hand the caller a reconstruction of what was recorded, so development
-    // and replay observe byte-identical responses.
-    return reconstructResponse(recording);
+    // The live caller gets the REAL response (review H3): a login/session
+    // flow needs its actual token or the adapter's next request carries
+    // [REDACTED] to the supplier — which would push auth traffic around the
+    // recorder and past sanitization entirely. Sanitization applies only to
+    // what persists under recordings/; replay determinism is unaffected
+    // because credential values never enter the fingerprint.
+    return reconstructResponse(capture);
   };
 }

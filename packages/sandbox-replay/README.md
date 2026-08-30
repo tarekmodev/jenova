@@ -6,7 +6,11 @@ transport with `createReplayTransport(...)`, a fetch-compatible function:
 - **record** (development only): the real request goes to the live supplier sandbox;
   the request/response pair (method, URL, headers, JSON or XML text body, status,
   timings) is persisted as one recording per interaction under
-  `recordings/<supplier>/<fingerprint>.json`.
+  `recordings/<supplier>/<fingerprint>.json`. The live caller always receives the
+  **real** supplier response — sanitization applies only to what is persisted under
+  `recordings/` (raw captures under `raw-captures/` are unsanitized as before).
+  Session/login flows depend on this: handing the adapter a redacted token would break
+  its next live call and push auth traffic around the recorder, past sanitization.
 - Recordings are keyed by a **normalized request fingerprint**: method + URL with
   volatile params (timestamps, nonces, correlation ids) normalized + a canonicalized
   body hash — so a re-run of the same scenario resolves to the same file.
