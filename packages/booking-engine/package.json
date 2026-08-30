@@ -1,0 +1,24 @@
+{
+  "name": "@jenova/booking-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@jenova/db": "workspace:*",
+    "@jenova/domain": "workspace:*",
+    "@jenova/supplier-sdk": "workspace:*",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
