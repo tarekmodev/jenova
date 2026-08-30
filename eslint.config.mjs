@@ -22,8 +22,19 @@ export default tseslint.config(
       "**/.next/**",
       "**/.turbo/**",
       "**/coverage/**",
+      "**/storybook-static/**",
+      "**/test-results/**",
+      "**/playwright-report/**",
       "packages/sandbox-replay/raw-captures/**",
     ],
+  },
+  {
+    // Plain Node ESM scripts (e.g. the ui screenshot harness's static
+    // server) — give the core rules the Node globals.
+    files: ["**/*.mjs"],
+    languageOptions: {
+      globals: { console: "readonly", process: "readonly", URL: "readonly" },
+    },
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

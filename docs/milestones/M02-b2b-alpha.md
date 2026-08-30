@@ -5,7 +5,7 @@ Portal books real sandbox hotels, bilingual from the first screen. TBO certifica
 submitted.
 
 ## Deliverables
-- [ ] `ui` package v1: Modernize (MUI) wrapped with Jenova theming; RTL/LTR switch;
+- [x] `ui` package v1: Modernize (MUI) wrapped with Jenova theming; RTL/LTR switch;
       core primitives (layout, tables, forms, toasts, empty/error states) — the only UI
       import for dashboard-class apps.
 - [ ] **Dashboard shell** (`apps/dashboard`): login (tenant-staff realm), app-framework
