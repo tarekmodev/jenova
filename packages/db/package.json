@@ -9,7 +9,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "migrate:fanout": "tsx src/cli/fanout.ts"
+    "migrate:fanout": "tsx src/cli/fanout.ts",
+    "migrate:ci": "tsx src/cli/ci-fanout.ts"
   },
   "dependencies": {
     "@jenova/domain": "workspace:*",
