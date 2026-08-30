@@ -28,6 +28,7 @@ const amountArb: fc.Arbitrary<bigint | number> = fc.oneof(
 );
 
 const claimsArb: fc.Arbitrary<OfferSignatureClaims> = fc.record({
+  tenantId: fc.string({ minLength: 1, maxLength: 64 }),
   offerId: fc.uuid(),
   sellAmount: amountArb,
   sellCurrency: fc.constantFrom<string>(...CURRENCIES),
@@ -47,6 +48,7 @@ function reordered(claims: OfferSignatureClaims): OfferSignatureClaims {
     sellCurrency: claims.sellCurrency,
     sellAmount: claims.sellAmount,
     offerId: claims.offerId,
+    tenantId: claims.tenantId,
   };
 }
 
@@ -73,6 +75,7 @@ describe("canonicalOfferClaims", () => {
     // A crafted token embedding the serializer's own delimiter must not
     // produce the serialization of different claims.
     const base: OfferSignatureClaims = {
+      tenantId: "tenant-sign",
       offerId: "0b543210-1111-4222-8333-444455556666",
       sellAmount: 5,
       sellCurrency: "SAR",
@@ -91,6 +94,7 @@ describe("canonicalOfferClaims", () => {
 
   it("refuses structurally invalid claims", () => {
     const base: OfferSignatureClaims = {
+      tenantId: "tenant-sign",
       offerId: "0b543210-1111-4222-8333-444455556666",
       sellAmount: 5,
       sellCurrency: "SAR",
@@ -99,6 +103,7 @@ describe("canonicalOfferClaims", () => {
       supplierOfferToken: "t",
       expiresAtMs: 1000,
     };
+    expect(() => canonicalOfferClaims({ ...base, tenantId: "" })).toThrow(OfferSigningError);
     expect(() => canonicalOfferClaims({ ...base, offerId: "not-a-uuid" })).toThrow(OfferSigningError);
     expect(() => canonicalOfferClaims({ ...base, sellCurrency: "sar" })).toThrow(OfferSigningError);
     expect(() => canonicalOfferClaims({ ...base, sellAmount: 1.5 })).toThrow(OfferSigningError);
@@ -133,6 +138,7 @@ describe("signOfferClaims / verifyOfferClaims", () => {
           (c) => ({ ...c, netCurrency: c.netCurrency === "SAR" ? "USD" : "SAR" }),
           (c) => ({ ...c, supplierOfferToken: `${c.supplierOfferToken}x` }),
           (c) => ({ ...c, expiresAtMs: c.expiresAtMs + 1 }),
+          (c) => ({ ...c, tenantId: `${c.tenantId}x` }),
           (c) => ({ ...c, offerId: c.offerId === otherUuid ? "00000000-0000-4000-8000-000000000000" : otherUuid }),
         ),
         (claims, tamper) => {
@@ -151,8 +157,30 @@ describe("signOfferClaims / verifyOfferClaims", () => {
     );
   });
 
+  it("rejects a malleated signature that decodes to the SAME 32 bytes (non-canonical base64url)", () => {
+    // 43 base64url chars carry 258 bits for a 256-bit MAC: the final char's
+    // low 2 bits are don't-care, so distinct strings decode identically.
+    // The primitive itself must accept only the one canonical encoding —
+    // not merely the byte value (review LOW-1).
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    fc.assert(
+      fc.property(claimsArb, (claims) => {
+        const good = signOfferClaims(KEY, claims);
+        const last = good[good.length - 1] as string;
+        const idx = alphabet.indexOf(last);
+        // Same high 4 bits (the MAC bits), different don't-care low bits.
+        const mutated = good.slice(0, -1) + alphabet[(idx & ~0b11) | ((idx + 1) & 0b11)];
+        expect(mutated).not.toBe(good);
+        expect(Buffer.from(mutated, "base64url").equals(Buffer.from(good, "base64url"))).toBe(true);
+        expect(verifyOfferClaims(KEY, claims, good)).toBe(true);
+        expect(verifyOfferClaims(KEY, claims, mutated)).toBe(false);
+      }),
+    );
+  });
+
   it("rejects malformed signatures without throwing", () => {
     const claims: OfferSignatureClaims = {
+      tenantId: "tenant-sign",
       offerId: "0b543210-1111-4222-8333-444455556666",
       sellAmount: 5,
       sellCurrency: "SAR",

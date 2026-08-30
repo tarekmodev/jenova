@@ -34,7 +34,7 @@ import { assemblePricedOffer } from "../pricing/offer";
 import type { PricingService } from "../pricing/pricing.service";
 import type { SettlementSpec } from "../pricing/resolve";
 import type { SupplierCredentialsSource, SupplierRegistry } from "../supplier-registry";
-import { SupplierUnavailableError } from "./errors";
+import { OfferError, SupplierUnavailableError } from "./errors";
 import type { OffersService, VerifiedOffer } from "./offers.service";
 
 export const OFFER_CHECK_SERVICE = Symbol("jenova.api.offerCheckService");
@@ -155,7 +155,16 @@ export class OfferCheckService {
     // Something moved — persist the supplier's CURRENT truth as a new
     // signed offer and invalidate the old one atomically.
     const successor = await this.buildSuccessor(tenant, offer, checked);
-    await this.offers.supersedeOffer(tenant, offer.id, successor.record);
+    const claimed = await this.offers.supersedeOffer(tenant, offer.id, successor.record);
+    if (!claimed) {
+      // A racing check (or sold_out) claimed this offer first; the winner's
+      // response carries the one live successor token. Never mint a second
+      // bookable successor (review MEDIUM-1) — refuse retryably instead.
+      throw new OfferError(
+        "offer_invalidated",
+        "this offer was already revalidated or withdrawn concurrently — use the latest check result or search again",
+      );
+    }
 
     if (netUnchanged && policyUnchanged) {
       // Only the supplier's own token rotated: same price, same terms —
@@ -255,6 +264,7 @@ export class OfferCheckService {
     );
     const checkedAt = this.now();
     const record = this.offers.buildRecord(
+      tenant,
       {
         offer: priced,
         supplierOfferToken: checked.supplierOfferToken,

@@ -23,6 +23,12 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 /** The signed claims — exactly what makes a price a bookable price. */
 export interface OfferSignatureClaims {
+  /**
+   * Tenant the offer belongs to. The signing key is process-wide, so
+   * binding the tenant into the HMAC makes a cross-tenant token fail at
+   * the SIGNATURE, not merely at the per-tenant row lookup (review LOW-2).
+   */
+  readonly tenantId: string;
   /** Offer row id (UUID). */
   readonly offerId: string;
   /** Sell amount in minor units (bigint from the row, number from Money). */
@@ -73,6 +79,9 @@ function canonicalAmount(value: bigint | number, field: string): string {
  * identically from bigint (row) and number (Money) representations.
  */
 export function canonicalOfferClaims(claims: OfferSignatureClaims): string {
+  if (claims.tenantId.length === 0) {
+    throw new OfferSigningError("tenantId must be non-empty");
+  }
   const offerId = claims.offerId.toLowerCase();
   if (!UUID_RE.test(offerId)) {
     throw new OfferSigningError("offerId must be a UUID");
@@ -88,6 +97,10 @@ export function canonicalOfferClaims(claims: OfferSignatureClaims): string {
   }
   return [
     "jenova.offer.v1",
+    "tenant",
+    // Tenant ids are free-form slugs/uuids — base64url like every other
+    // free-form value, so no crafted id can shift field boundaries.
+    Buffer.from(claims.tenantId, "utf8").toString("base64url"),
     offerId,
     "sell",
     canonicalAmount(claims.sellAmount, "sellAmount"),
@@ -130,6 +143,15 @@ export function verifyOfferClaims(
   if (presented.length !== SIGNATURE_BYTES) {
     // Length is public (all real signatures are 32 bytes) — rejecting early
     // leaks nothing; timingSafeEqual requires equal lengths anyway.
+    return false;
+  }
+  if (presented.toString("base64url") !== signature) {
+    // Base64url malleability (review LOW-1): 43 chars carry 258 bits for a
+    // 256-bit MAC, so the final char has 2 don't-care bits — several
+    // DISTINCT strings decode to the same 32 bytes. A signature string is
+    // valid only in its one canonical encoding; anything else is a forgery
+    // attempt or corruption. (Comparing the attacker's string against its
+    // own re-encode involves no secret, so plain !== is fine here.)
     return false;
   }
   return timingSafeEqual(expected, presented);

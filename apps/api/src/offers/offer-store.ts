@@ -78,8 +78,19 @@ export interface OfferStore {
   markChecked(tenant: TenantId, offerId: string, at: Date): Promise<void>;
   /** Withdraws the offer permanently (sold_out / superseded); idempotent. */
   invalidate(tenant: TenantId, offerId: string, at: Date): Promise<void>;
-  /** Atomically invalidates `oldOfferId` and inserts its successor. */
-  supersede(tenant: TenantId, oldOfferId: string, replacement: NewOfferRecord, at: Date): Promise<void>;
+  /**
+   * Atomically claims `oldOfferId` (its invalidation must actually flip the
+   * row) and inserts its successor in the same transaction. Returns false —
+   * inserting NOTHING — when the old offer was already invalidated, e.g. by
+   * a concurrently racing check (review MEDIUM-1): for one offer there is
+   * never more than one bookable successor.
+   */
+  supersede(
+    tenant: TenantId,
+    oldOfferId: string,
+    replacement: NewOfferRecord,
+    at: Date,
+  ): Promise<boolean>;
 }
 
 function amountFrom(value: bigint, field: string): number {
@@ -174,14 +185,23 @@ export class DrizzleOfferStore implements OfferStore {
     oldOfferId: string,
     replacement: NewOfferRecord,
     at: Date,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const db = await this.resolver.getTenantDb(tenant);
-    await db.transaction(async (tx) => {
-      await tx
+    return db.transaction(async (tx) => {
+      // The conditional UPDATE is the claim: under a concurrent supersede,
+      // the second transaction blocks on the row lock, re-evaluates the
+      // predicate against the winner's committed invalidated_at, matches
+      // nothing — and must then insert nothing (review MEDIUM-1).
+      const claimed = await tx
         .update(offers)
         .set({ invalidatedAt: at })
-        .where(and(eq(offers.id, oldOfferId), isNull(offers.invalidatedAt)));
+        .where(and(eq(offers.id, oldOfferId), isNull(offers.invalidatedAt)))
+        .returning({ id: offers.id });
+      if (claimed.length !== 1) {
+        return false;
+      }
       await tx.insert(offers).values(toInsertRow(replacement));
+      return true;
     });
   }
 }
@@ -244,9 +264,14 @@ export class InMemoryOfferStore implements OfferStore {
     oldOfferId: string,
     replacement: NewOfferRecord,
     at: Date,
-  ): Promise<void> {
+  ): Promise<boolean> {
+    const row = this.tenantMap(tenant).get(oldOfferId);
+    if (row === undefined || row.invalidatedAt !== null) {
+      return false; // already claimed elsewhere — insert nothing
+    }
     await this.invalidate(tenant, oldOfferId, at);
     await this.insert(tenant, replacement);
+    return true;
   }
 
   /** Test hook: raw row mutation to simulate at-rest tampering. */

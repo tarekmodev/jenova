@@ -18,13 +18,25 @@ import { loadMigrationDir } from "../migrations/loader";
 export const TEST_PG_URL =
   process.env.JENOVA_TEST_PG_URL ?? "postgres://jenova:jenova@localhost:5432/jenova_control_plane";
 
-/** Probe once per file; integration suites skip (loudly) when Postgres is down. */
+/**
+ * Probe once per file; integration suites skip (loudly) when Postgres is
+ * down. With JENOVA_REQUIRE_PG set (CI does this), an unreachable Postgres
+ * FAILS the suite instead — a database-backed suite must never green-skip
+ * where its database is supposed to exist.
+ */
 export async function pgAvailable(): Promise<boolean> {
   const sql = connectPg(TEST_PG_URL, undefined, { max: 1 });
   try {
     await sql`select 1`;
     return true;
-  } catch {
+  } catch (error) {
+    const required = process.env.JENOVA_REQUIRE_PG;
+    if (required !== undefined && required !== "") {
+      throw new Error(
+        `JENOVA_REQUIRE_PG is set but Postgres is unreachable at ${TEST_PG_URL} — refusing to skip integration suites`,
+        { cause: error },
+      );
+    }
     console.warn(
       `[@jenova/db] Postgres unreachable at ${TEST_PG_URL} — integration tests SKIPPED. Run: docker compose up -d postgres`,
     );

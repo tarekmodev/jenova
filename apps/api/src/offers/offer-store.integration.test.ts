@@ -137,8 +137,8 @@ describe.skipIf(!available)("DrizzleOfferStore + OffersService on tenant Postgre
   it("supersede atomically invalidates the old offer and persists the successor", async () => {
     const expiresAt = new Date(Date.now() + 5 * 60_000);
     const issued = await service.issueOffer(tenant, issueInput(expiresAt));
-    const replacement = service.buildRecord(issueInput(expiresAt, "opaque-token-2"), new Date());
-    await service.supersedeOffer(tenant, issued.offerId, replacement);
+    const replacement = service.buildRecord(tenant, issueInput(expiresAt, "opaque-token-2"), new Date());
+    await expect(service.supersedeOffer(tenant, issued.offerId, replacement)).resolves.toBe(true);
 
     await expect(service.verifyOfferToken(tenant, issued.offerToken)).rejects.toMatchObject({
       kind: "offer_invalidated",
@@ -146,5 +146,31 @@ describe.skipIf(!available)("DrizzleOfferStore + OffersService on tenant Postgre
     const successor = await service.verifyOfferToken(tenant, service.tokenFor(replacement));
     expect(successor.supplierOfferToken).toBe("opaque-token-2");
     expect(successor.checkedAt).not.toBeNull();
+  });
+
+  it("two RACING supersedes mint exactly one bookable successor (review MEDIUM-1)", async () => {
+    const expiresAt = new Date(Date.now() + 5 * 60_000);
+    const issued = await service.issueOffer(tenant, issueInput(expiresAt));
+    const a = service.buildRecord(tenant, issueInput(expiresAt, "racer-token-a"), new Date());
+    const b = service.buildRecord(tenant, issueInput(expiresAt, "racer-token-b"), new Date());
+
+    // Two concurrent transactions contend for the same old row: the claim
+    // (conditional invalidate, rowcount-gated) must admit exactly one.
+    const [claimedA, claimedB] = await Promise.all([
+      service.supersedeOffer(tenant, issued.offerId, a),
+      service.supersedeOffer(tenant, issued.offerId, b),
+    ]);
+    expect([claimedA, claimedB].filter(Boolean)).toHaveLength(1);
+
+    const winner = claimedA ? a : b;
+    const loser = claimedA ? b : a;
+    await expect(service.requireBookableOffer(tenant, service.tokenFor(winner))).resolves.toBeDefined();
+    // The loser inserted NOTHING — its would-be token addresses no row.
+    await expect(service.verifyOfferToken(tenant, service.tokenFor(loser))).rejects.toMatchObject({
+      kind: "offer_not_found",
+    });
+    await expect(service.verifyOfferToken(tenant, issued.offerToken)).rejects.toMatchObject({
+      kind: "offer_invalidated",
+    });
   });
 });

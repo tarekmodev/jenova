@@ -172,7 +172,7 @@ export class OffersService {
    * book. `checkedAt: null`: a fresh offer must pass `check` before booking.
    */
   async issueOffer(tenant: TenantId, input: IssueOfferInput): Promise<IssuedOffer> {
-    const record = this.buildRecord(input, null);
+    const record = this.buildRecord(tenant, input, null);
     await this.store.insert(tenant, record);
     return {
       offerId: record.id,
@@ -183,9 +183,11 @@ export class OffersService {
 
   /**
    * Builds a fully validated, signed offer record WITHOUT persisting it —
-   * the check flow uses this to supersede an offer atomically.
+   * the check flow uses this to supersede an offer atomically. The tenant
+   * participates in the signature (a cross-tenant token fails at the HMAC,
+   * not merely at the per-tenant row lookup).
    */
-  buildRecord(input: IssueOfferInput, checkedAt: Date | null): NewOfferRecord {
+  buildRecord(tenant: TenantId, input: IssueOfferInput, checkedAt: Date | null): NewOfferRecord {
     const { offer } = input;
     assertValidMoney(offer.net);
     assertValidMoney(offer.sell);
@@ -211,7 +213,7 @@ export class OffersService {
       throw new Error(`offer TTL exceeds the ${MAX_OFFER_TTL_SECONDS}s cap — offers are short-lived by design`);
     }
     // The fresh id participates in the hash, so mint it first and sign after.
-    return this.withPriceHash({
+    return this.withPriceHash(tenant, {
       id: randomUUID(),
       supplierCode: offer.supplierCode,
       vertical: offer.vertical,
@@ -259,7 +261,7 @@ export class OffersService {
     if (row === null) {
       throw new OfferError("offer_not_found", "unknown offer");
     }
-    const verified = this.verifyRow(row, parsed.signature);
+    const verified = this.verifyRow(tenant, row, parsed.signature);
     if (verified === null) {
       throw new OfferError("offer_not_found", "unknown offer");
     }
@@ -310,23 +312,31 @@ export class OffersService {
     await this.store.invalidate(tenant, offerId, this.now());
   }
 
-  /** Atomically replaces `oldOfferId` with a re-priced successor. */
+  /**
+   * Atomically replaces `oldOfferId` with a re-priced successor. False when
+   * a concurrently racing check claimed the old offer first — the successor
+   * is then NOT persisted (one offer, at most one bookable successor).
+   */
   async supersedeOffer(
     tenant: TenantId,
     oldOfferId: string,
     replacement: NewOfferRecord,
-  ): Promise<void> {
-    await this.store.supersede(tenant, oldOfferId, replacement, this.now());
+  ): Promise<boolean> {
+    return this.store.supersede(tenant, oldOfferId, replacement, this.now());
   }
 
-  private claimsOf(record: {
-    id: string;
-    net: NewOfferRecord["net"];
-    sell: NewOfferRecord["sell"];
-    supplierOfferToken: string;
-    expiresAt: Date;
-  }): OfferSignatureClaims {
+  private claimsOf(
+    tenant: TenantId,
+    record: {
+      id: string;
+      net: NewOfferRecord["net"];
+      sell: NewOfferRecord["sell"];
+      supplierOfferToken: string;
+      expiresAt: Date;
+    },
+  ): OfferSignatureClaims {
     return {
+      tenantId: tenant,
       offerId: record.id,
       sellAmount: record.sell.amount,
       sellCurrency: record.sell.currency,
@@ -337,12 +347,12 @@ export class OffersService {
     };
   }
 
-  private withPriceHash(record: NewOfferRecord): NewOfferRecord {
-    return { ...record, priceHash: signOfferClaims(this.signingKey, this.claimsOf(record)) };
+  private withPriceHash(tenant: TenantId, record: NewOfferRecord): NewOfferRecord {
+    return { ...record, priceHash: signOfferClaims(this.signingKey, this.claimsOf(tenant, record)) };
   }
 
   /** Null when the row is unverifiable — missing fields or bad signature. */
-  private verifyRow(row: StoredOffer, signature: string): VerifiedOffer | null {
+  private verifyRow(tenant: TenantId, row: StoredOffer, signature: string): VerifiedOffer | null {
     if (
       row.supplierOfferToken === null ||
       row.canonicalPropertyId === null ||
@@ -353,7 +363,7 @@ export class OffersService {
     ) {
       return null;
     }
-    const claims = this.claimsOf({
+    const claims = this.claimsOf(tenant, {
       id: row.id,
       net: row.net,
       sell: row.sell,
@@ -363,10 +373,12 @@ export class OffersService {
     if (!verifyOfferClaims(this.signingKey, claims, signature)) {
       return null;
     }
-    // Defense in depth: the stored price_hash must equal the presented
-    // signature — a row whose hash column was rewritten alongside its
-    // amounts still fails, because the signature the CLIENT holds was
-    // minted with the server key over the original amounts.
+    // LOAD-BEARING (not removable hardening): the presented signature must
+    // be the exact string minted at issue time. This independently pins
+    // signature-string uniqueness (verifyOfferClaims also rejects
+    // non-canonical base64url, but this check must not rely on that) and
+    // fails a row whose hash column was rewritten alongside its amounts —
+    // the client's signature was minted over the original amounts.
     if (row.priceHash !== signature) {
       return null;
     }

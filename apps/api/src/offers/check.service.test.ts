@@ -206,6 +206,22 @@ describe("checkOffer — price changed", () => {
     expect(successor.id).toBe(result.newOfferId);
   });
 
+  it("the LOSING racer of a concurrent supersede mints no second successor (review MEDIUM-1)", async () => {
+    const h = harness();
+    const issued = await h.issue();
+    // Simulate the race: while THIS check is out at the supplier, a rival
+    // check (or sold_out) claims the offer. The store's conditional claim
+    // then refuses this caller's supersede.
+    h.adapter.onCheck = () => {
+      h.store.tamper(TENANT, issued.offerId, { invalidatedAt: new Date(h.clock.now) });
+      return h.echo({ net: money(55_000, "SAR") });
+    };
+
+    await expect(h.service.checkOffer(TENANT, issued.offerToken)).rejects.toMatchObject({
+      kind: "offer_invalidated",
+    });
+  });
+
   it("a policy-only change also supersedes, flagged for re-approval", async () => {
     const h = harness();
     const issued = await h.issue();
