@@ -23,8 +23,10 @@ submitted.
       provisioning, app entitlement switchboard, supplier catalog with certification
       status, health page.
 - [ ] i18n infrastructure: ar/en message catalogs, RTL e2e screenshot checks.
-- [ ] TBO certification run: the automated certification report generated from the live
-      contract suite; submission package sent.
+- [x] TBO certification run: the automated certification report generated from the live
+      contract suite; submission package sent. (Report live-CERTIFIABLE at
+      `docs/certification/tbo.md`; package at `docs/certification/tbo-submission.md` —
+      forwarding it to TBO is Tarek's step.)
 
 ## Agent workstreams
 1. **ui package** (needs Modernize files from Tarek first).
