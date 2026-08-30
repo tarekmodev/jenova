@@ -78,6 +78,70 @@ describe("sanitizeBody", () => {
   });
 });
 
+describe("sanitizeBody — form-urlencoded (review C1)", () => {
+  it("redacts credential params in an OAuth2-style client-credentials body", () => {
+    const sanitized = sanitizeBody(
+      `grant_type=client_credentials&client_id=alpha&client_secret=${FAKE_TOKEN}`,
+      redaction,
+    );
+    expect(sanitized).not.toContain(FAKE_TOKEN);
+    expect(sanitized).toContain("grant_type=client_credentials");
+    expect(sanitized).toContain("client_id=alpha");
+    expect(sanitized).toContain(`client_secret=${REDACTED}`);
+  });
+
+  it("honors extra param names from the configurable redaction list", () => {
+    const custom = resolveRedaction({ queryParams: ["vendor_pin"] });
+    const sanitized = sanitizeBody(`vendor_pin=${FAKE_TOKEN}&q=alpha`, custom);
+    expect(sanitized).not.toContain(FAKE_TOKEN);
+    expect(sanitized).toContain("q=alpha");
+  });
+
+  it("redacts urlencoded credential fragments embedded in other text bodies", () => {
+    const sanitized = sanitizeBody(
+      JSON.stringify({ note: `callback?state=1&access_token=${FAKE_TOKEN}` }),
+      redaction,
+    );
+    expect(sanitized).not.toContain(FAKE_TOKEN);
+    expect(sanitized).toContain("state=1");
+  });
+});
+
+describe("sanitizeBody — namespaced XML (review C2)", () => {
+  it("redacts namespaced credential elements by local name", () => {
+    const sanitized = sanitizeBody(
+      `<x:req><wsse:Password>${FAKE_TOKEN}</wsse:Password><x:q>alpha</x:q></x:req>`,
+      redaction,
+    );
+    expect(sanitized).not.toContain(FAKE_TOKEN);
+    expect(sanitized).toContain("<x:q>alpha</x:q>");
+  });
+
+  it("redacts other namespace prefixes and namespaced credential attributes", () => {
+    const sanitized = sanitizeBody(
+      `<r ns:session_id="${FAKE_TOKEN}"><ns2:ApiKey>${FAKE_TOKEN}</ns2:ApiKey></r>`,
+      redaction,
+    );
+    expect(sanitized).not.toContain(FAKE_TOKEN);
+  });
+});
+
+describe("sanitizeBody — CDATA content (review H1)", () => {
+  it("redacts CDATA-wrapped content of credential-named elements", () => {
+    const sanitized = sanitizeBody(
+      `<r><Token><![CDATA[${FAKE_TOKEN}]]></Token><q>alpha</q></r>`,
+      redaction,
+    );
+    expect(sanitized).not.toContain(FAKE_TOKEN);
+    expect(sanitized).toContain("<q>alpha</q>");
+  });
+
+  it("keeps CDATA in non-credential elements intact", () => {
+    const sanitized = sanitizeBody("<r><note><![CDATA[plain <text> here]]></note></r>", redaction);
+    expect(sanitized).toContain("<![CDATA[plain <text> here]]>");
+  });
+});
+
 describe("sanitizeRecording", () => {
   it("sanitizes both sides and preserves everything else", () => {
     const recording: Recording = {

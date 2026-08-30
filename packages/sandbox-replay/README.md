@@ -27,9 +27,11 @@ obligation. CI resolves from recordings only.
 
 Before anything persists to `recordings/`, `sanitizeRecording` strips every piece of
 credential material: auth/api-key/signature/cookie headers, credential query params and
-basic-auth userinfo in URLs, credential-named JSON keys and XML elements/attributes,
-and bearer/basic/JWT-shaped strings inside any text value — all replaced with
-`[REDACTED]`. The redaction list is configurable per adapter (extra names merge **on
+basic-auth userinfo in URLs, credential-named JSON keys, form-urlencoded params (the
+OAuth2 client-credentials shape), XML elements and attributes — including namespaced
+names (`<wsse:Password>`, matched by local name) and `<![CDATA[...]]>` content — and
+bearer/basic/JWT-shaped or `name=value` credential assignments inside any text value —
+all replaced with `[REDACTED]`. The redaction list is configurable per adapter (extra names merge **on
 top of** the safe defaults, never instead of them). Credential params are also treated
 as volatile for fingerprinting, so credentials never enter the hash input and rotating
 sandbox credentials cannot orphan recordings.
@@ -37,9 +39,11 @@ sandbox credentials cannot orphan recordings.
 The unsanitized capture only ever lands in `raw-captures/`, which is gitignored at the
 repo root — raw captures never leave this package's directory and are never committed.
 
-`credential-guard.test.ts` is the CI gate: it scans every committed recording for
-credential patterns (bearer tokens, basic-auth base64, JWTs, common key shapes) and
-fails the build on any match.
+`credential-guard.test.ts` is the CI gate: it scans every file under `recordings/`
+(regardless of extension), contents and file names both, for credential patterns —
+bearer tokens, basic-auth base64, JWTs, common key shapes, and every assignment shape
+the sanitizer redacts (JSON, urlencoded, XML element/attribute, CDATA) — and fails the
+build on any match.
 
 ## The data rule (CLAUDE.md rule 5)
 

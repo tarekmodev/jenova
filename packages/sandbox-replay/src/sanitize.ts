@@ -56,6 +56,16 @@ const TEXT_CREDENTIAL_PATTERNS: readonly RegExp[] = [
   /\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\b/g,
 ];
 
+/**
+ * Urlencoded credential assignment (`client_secret=...`) inside ANY text
+ * value — the fallback pass behind the structured form-urlencoded handling
+ * (review C1). The name is kept, the value is redacted.
+ */
+const URLENCODED_CREDENTIAL_PATTERN = new RegExp(
+  `([\\w.-]*(?:${DEFAULT_REDACTED_KEY_PATTERN.source})[\\w.-]*)=(?!\\[REDACTED\\])[^&\\s"'<>]+`,
+  "gi",
+);
+
 export interface RedactionConfig {
   /** Extra header names, merged with DEFAULT_REDACTED_HEADERS. */
   headers?: readonly string[];
@@ -82,6 +92,16 @@ export function resolveRedaction(config: RedactionConfig = {}): ResolvedRedactio
 
 function isRedactedKey(key: string, redaction: ResolvedRedaction): boolean {
   return DEFAULT_REDACTED_KEY_PATTERN.test(key) || redaction.bodyKeys.has(key.toLowerCase());
+}
+
+/** Strip any namespace prefix: `wsse:Password` → `Password` (review C2). */
+function localName(name: string): string {
+  const idx = name.lastIndexOf(":");
+  return idx === -1 ? name : name.slice(idx + 1);
+}
+
+function isCredentialParam(name: string, redaction: ResolvedRedaction): boolean {
+  return redaction.queryParams.has(name.toLowerCase()) || isRedactedKey(name, redaction);
 }
 
 export function sanitizeHeaders(
@@ -115,7 +135,7 @@ export function sanitizeText(text: string): string {
   for (const pattern of TEXT_CREDENTIAL_PATTERNS) {
     sanitized = sanitized.replace(pattern, REDACTED);
   }
-  return sanitized;
+  return sanitized.replace(URLENCODED_CREDENTIAL_PATTERN, `$1=${REDACTED}`);
 }
 
 function sanitizeJson(value: unknown, redaction: ResolvedRedaction): unknown {
@@ -132,19 +152,55 @@ function sanitizeJson(value: unknown, redaction: ResolvedRedaction): unknown {
 }
 
 function sanitizeXml(body: string, redaction: ResolvedRedaction): string {
-  // Element content: <ApiKey ...>secret</ApiKey> — match by tag name.
+  // Element content: <ApiKey ...>secret</ApiKey> — match by LOCAL tag name so
+  // namespaced elements (<wsse:Password>, <ns2:ApiKey>) are caught (review
+  // C2), including <![CDATA[...]]> content (review H1).
   let sanitized = body.replace(
-    /<([A-Za-z_][\w.-]*)((?:\s[^<>]*)?)>([^<]*)<\/\1>/g,
+    /<([A-Za-z_][\w.:-]*)((?:\s[^<>]*)?)>((?:<!\[CDATA\[[\s\S]*?\]\]>|[^<])*)<\/\1>/g,
     (whole, tag: string, attrs: string) =>
-      isRedactedKey(tag, redaction) ? `<${tag}${attrs}>${REDACTED}</${tag}>` : whole,
+      isRedactedKey(localName(tag), redaction) ? `<${tag}${attrs}>${REDACTED}</${tag}>` : whole,
   );
-  // Attribute values: password="secret" / token='secret' — match by attribute name.
+  // Attribute values: password="secret" / wsse:Token='secret' — match by
+  // local attribute name.
   sanitized = sanitized.replace(
-    /([A-Za-z_][\w.-]*)\s*=\s*("([^"]*)"|'([^']*)')/g,
+    /([A-Za-z_][\w.:-]*)\s*=\s*("([^"]*)"|'([^']*)')/g,
     (whole, name: string, _quoted: string, dq: string | undefined) =>
-      isRedactedKey(name, redaction) ? `${name}=${dq === undefined ? "'" : '"'}${REDACTED}${dq === undefined ? "'" : '"'}` : whole,
+      isRedactedKey(localName(name), redaction) ? `${name}=${dq === undefined ? "'" : '"'}${REDACTED}${dq === undefined ? "'" : '"'}` : whole,
   );
   return sanitizeText(sanitized);
+}
+
+/** `a=1&b=2` with no tags/whitespace — a form-urlencoded body (review C1). */
+function isUrlencodedShaped(body: string): boolean {
+  return /^[^=&\s<]+=[^&\s]*(?:&[^=&\s<]+=[^&\s]*)*$/.test(body.trim());
+}
+
+/**
+ * Structured pass for application/x-www-form-urlencoded bodies (review C1) —
+ * the OAuth2 client-credentials shape. Redacts by param name using the same
+ * merged name logic as sanitizeUrl plus the credential key pattern, while
+ * preserving the original encoding of everything kept.
+ */
+function sanitizeUrlencoded(body: string, redaction: ResolvedRedaction): string {
+  return body
+    .trim()
+    .split("&")
+    .map((pair) => {
+      const eq = pair.indexOf("=");
+      if (eq === -1) return pair;
+      const name = pair.slice(0, eq);
+      const value = pair.slice(eq + 1);
+      let decodedName = name;
+      try {
+        decodedName = decodeURIComponent(name);
+      } catch {
+        // keep the raw name — redaction still sees it verbatim
+      }
+      return isCredentialParam(decodedName, redaction)
+        ? `${name}=${REDACTED}`
+        : `${name}=${sanitizeText(value)}`;
+    })
+    .join("&");
 }
 
 export function sanitizeBody(body: string | null, redaction: ResolvedRedaction): string | null {
@@ -152,8 +208,10 @@ export function sanitizeBody(body: string | null, redaction: ResolvedRedaction):
   try {
     return JSON.stringify(sanitizeJson(JSON.parse(body), redaction));
   } catch {
-    return sanitizeXml(body, redaction);
+    // not JSON
   }
+  if (isUrlencodedShaped(body)) return sanitizeUrlencoded(body, redaction);
+  return sanitizeXml(body, redaction);
 }
 
 /**
