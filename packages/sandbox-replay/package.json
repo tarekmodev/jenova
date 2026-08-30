@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "devDependencies": {
+    "@types/node": "^22.10.0",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

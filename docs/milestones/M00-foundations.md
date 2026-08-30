@@ -11,7 +11,7 @@ test it, and ship a reviewed PR to staging — unaided.
 - [x] `domain` package: Money, tenancy brands, SalesChannel/AppKey/Vertical types,
       BookingItemState machine as data, CancellationPolicy, SupplierError taxonomy.
       Unit + property tests (money arithmetic, transition legality).
-- [ ] `db` package: control-plane schema v1 (Tenant, AppInstallation, PlatformUser,
+- [x] `db` package: control-plane schema v1 (Tenant, AppInstallation, PlatformUser,
       SupplierCatalogEntry) + tenant schema v1 (SupplierAccount, Agency, MarkupRule,
       Booking, BookingItem, LedgerAccount, JournalEntry, AuditEvent, Offer);
       **per-tenant database provisioning** + **fan-out migration runner** with dry-run,
@@ -20,7 +20,7 @@ test it, and ship a reviewed PR to staging — unaided.
       credentials types; transport codecs skeleton (retrying HTTP client with deadline
       budgets + circuit breaker; JSON codec; XML/SOAP codec with schema validation);
       contract-test harness skeleton.
-- [ ] `sandbox-replay` package: recording proxy (fingerprint keying, auth sanitization),
+- [x] `sandbox-replay` package: recording proxy (fingerprint keying, auth sanitization),
       replay resolver, "record this scenario first" failure mode.
 - [x] `apps/api` skeleton: NestJS bootstrap, gateway middleware chain stubs
       (host→tenant resolution, auth realm stub, entitlement check stub), health/ready.
@@ -29,7 +29,8 @@ test it, and ship a reviewed PR to staging — unaided.
 - [x] Local dev: Docker Compose (Postgres, Redis, MinIO, mailpit); `.env.example` with
       supplier-credential placeholders keyed to Tarek's list.
 - [x] CI: lint, typecheck, tests, migration fan-out dry-run on synthetic tenant DBs
-      (dry-run step is a placeholder echo until `@jenova/db` lands — issue #3).
+      (real job: fresh control-plane + 3 synthetic tenant DBs, dry-run then apply,
+      plus the db integration suite — schema only, no fabricated data).
 - [ ] Staging: Terraform for one VM + managed Postgres in me-south-1; deploy on main.
 
 ## Agent workstreams (parallel)

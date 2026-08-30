@@ -36,5 +36,45 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: migration-fanout-dry-run
-        run: 'echo "pending @jenova/db (issue #3)"'
+  # Migration fan-out gate (issue #22): fresh control-plane + 3 synthetic
+  # tenant databases (schema only — no fabricated business data), fan-out
+  # dry-run then apply, then the db integration suite against the same
+  # disposable server. Fails on any error.
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: jenova
+          POSTGRES_PASSWORD: jenova
+          POSTGRES_DB: jenova
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U jenova -d jenova"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Migration fan-out (fresh control-plane + 3 synthetic tenant DBs)
+        run: pnpm --filter @jenova/db migrate:ci
+        env:
+          JENOVA_CI_PG_URL: postgres://jenova:jenova@localhost:5432/jenova
+
+      - name: db integration tests (against the CI Postgres)
+        run: pnpm --filter @jenova/db test
+        env:
+          JENOVA_TEST_PG_URL: postgres://jenova:jenova@localhost:5432/jenova

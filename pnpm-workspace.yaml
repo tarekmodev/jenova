@@ -10,6 +10,8 @@ allowBuilds:
   # argon2's install script is node-gyp-build: it RESOLVES the shipped
   # prebuilt N-API binary (win32/linux/mac), compiling only if none fits.
   argon2: true
+  # esbuild ships the platform binary as an optional dependency; its install
+  # script only verifies it (needed by tsx, which runs the migration CLIs).
   esbuild: true
   unrs-resolver: true
 
