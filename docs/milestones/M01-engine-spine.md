@@ -12,10 +12,16 @@ recorded traffic powering CI. No UI yet beyond API endpoints.
       (#49: full lifecycle proven live — booking LV**** booked and cancelled;
       rate_limited unreachable without violating look-to-book, documented in the
       adapter README.)
-- [ ] **Search & availability service** (`api/hotel-search`): fan-out orchestrator
+- [x] **Search & availability service** (`api/hotel-search`): fan-out orchestrator
       (single supplier for now, N-ready), hard time budget, SSE streaming, availability
       cache keyed (supplier, property, dates, occupancy, nationality), static-content
       cache.
+      (#59/#60/#61: partial results first-class, per-supplier taxonomy isolation;
+      POST /hotel-search SSE under the agency realm; tenant-scoped cache keys with
+      nationality never dropped — cached availability is re-priced and re-issued as
+      fresh signed offers on every search. Proven live via SSE against the TBO
+      sandbox 2026-08-30, recorded; second search served from the availability
+      cache with zero supplier calls.)
 - [x] **Pricing engine** (`api/pricing`): pure resolve(net, context) → sell + breakdown;
       most-specific-wins MarkupRule resolution; fired-rule id stored on Offer;
       property-based tests (never negative margin unless rule explicitly allows, VAT

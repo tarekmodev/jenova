@@ -20,6 +20,7 @@ describe("loadApiConfig", () => {
       redisUrl: validEnv.REDIS_URL,
       tenantRuntimeDsn: validEnv.JENOVA_TENANT_RUNTIME_DSN,
       offerSigningKey: validEnv.OFFER_SIGNING_KEY,
+      hotelSearchBudgetMs: 8_000,
     });
     expect(Object.isFrozen(config)).toBe(true);
   });
@@ -65,6 +66,18 @@ describe("loadApiConfig", () => {
 
   it("rejects an unknown NODE_ENV", () => {
     expect(() => loadApiConfig({ ...validEnv, NODE_ENV: "staging" })).toThrowError(
+      ApiConfigError,
+    );
+  });
+
+  it("honors HOTEL_SEARCH_BUDGET_MS within bounds and rejects it outside them", () => {
+    expect(loadApiConfig({ ...validEnv, HOTEL_SEARCH_BUDGET_MS: "5000" }).hotelSearchBudgetMs).toBe(
+      5_000,
+    );
+    expect(() => loadApiConfig({ ...validEnv, HOTEL_SEARCH_BUDGET_MS: "100" })).toThrowError(
+      /HOTEL_SEARCH_BUDGET_MS/,
+    );
+    expect(() => loadApiConfig({ ...validEnv, HOTEL_SEARCH_BUDGET_MS: "60000" })).toThrowError(
       ApiConfigError,
     );
   });

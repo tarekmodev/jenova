@@ -30,6 +30,9 @@ const apiEnvSchema = z.object({
   // in-flight shoppers re-search (offers live minutes; rotation costs one
   // brief re-search window, never money). See offers/signing.ts.
   OFFER_SIGNING_KEY: z.string().min(32),
+  // Hard total budget for one hotel search fan-out (docs/02: ~8s hotels).
+  // Platform-level; the service clamps any value to its safe bounds.
+  HOTEL_SEARCH_BUDGET_MS: z.coerce.number().int().min(500).max(30_000).default(8_000),
 });
 
 export interface ApiConfig {
@@ -39,6 +42,7 @@ export interface ApiConfig {
   readonly redisUrl: string;
   readonly tenantRuntimeDsn: string;
   readonly offerSigningKey: string;
+  readonly hotelSearchBudgetMs: number;
 }
 
 /** Nest injection token for the loaded {@link ApiConfig}. */
@@ -70,5 +74,6 @@ export function loadApiConfig(env: Readonly<Record<string, string | undefined>>)
     redisUrl: parsed.data.REDIS_URL,
     tenantRuntimeDsn: parsed.data.JENOVA_TENANT_RUNTIME_DSN,
     offerSigningKey: parsed.data.OFFER_SIGNING_KEY,
+    hotelSearchBudgetMs: parsed.data.HOTEL_SEARCH_BUDGET_MS,
   });
 }

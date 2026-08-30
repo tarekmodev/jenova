@@ -21,6 +21,7 @@ const testConfig: ApiConfig = Object.freeze({
   redisUrl: "redis://localhost:6379",
   tenantRuntimeDsn: "postgres://jenova_app:jenova_app@localhost:5432/postgres",
   offerSigningKey: "dev-only-offer-signing-key-change-me-0000",
+  hotelSearchBudgetMs: 8_000,
 });
 
 const KNOWN_HOST = "tenant-one.example.test";
