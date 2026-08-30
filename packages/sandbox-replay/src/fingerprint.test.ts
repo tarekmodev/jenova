@@ -46,6 +46,25 @@ describe("canonicalizeBody", () => {
       canonicalizeBody("<r><a>2</a></r>", volatile),
     );
   });
+
+  it("normalizes volatile XML attribute values but keeps their presence (M2)", () => {
+    const a = canonicalizeBody('<r ts="111"><a>1</a></r>', volatile);
+    const b = canonicalizeBody('<r ts="222"><a>1</a></r>', volatile);
+    const c = canonicalizeBody("<r><a>1</a></r>", volatile);
+    expect(a).toBe(b);
+    expect(a).not.toBe(c);
+    expect(a).not.toContain("111");
+  });
+
+  it("normalizes volatile XML leaf elements by local name, namespaces included (M2)", () => {
+    expect(canonicalizeBody("<r><ns:nonce>x1</ns:nonce><a>1</a></r>", volatile)).toBe(
+      canonicalizeBody("<r><ns:nonce>x2</ns:nonce><a>1</a></r>", volatile),
+    );
+    // Non-volatile elements keep their values.
+    expect(canonicalizeBody("<r><ns:nonce>x1</ns:nonce><a>1</a></r>", volatile)).not.toBe(
+      canonicalizeBody("<r><ns:nonce>x1</ns:nonce><a>2</a></r>", volatile),
+    );
+  });
 });
 
 describe("fingerprintRequest", () => {
@@ -69,6 +88,31 @@ describe("fingerprintRequest", () => {
     expect(
       fingerprintRequest("POST", "https://api.example.test/v2/items?a=1&b=2", '{"q":"alpha"}'),
     ).not.toBe(base);
+  });
+
+  // Structural SOAP envelopes only — generic elements, no supplier shapes.
+  // EchoToken/TimeStamp are the OTA-style volatile ATTRIBUTE names from
+  // DEFAULT_VOLATILE_PARAMS, the mechanism under test (M2).
+  const envelope = (echo: string, stamp: string, nonce: string, term: string): string =>
+    `<s:Envelope><s:Body><q EchoToken="${echo}" TimeStamp="${stamp}">` +
+    `<ns:Nonce>${nonce}</ns:Nonce><term>${term}</term></q></s:Body></s:Envelope>`;
+
+  it("fingerprints SOAP envelopes identically across volatile attr/element churn (M2)", () => {
+    const soapUrl = "https://api.example.test/v1/soap";
+    const first = envelope("e-1", "2026-08-30T10:00:00Z", "n-1", "alpha");
+    const rerecorded = envelope("e-2", "2026-08-31T09:00:00Z", "n-2", "alpha");
+    expect(fingerprintRequest("POST", soapUrl, first)).toBe(
+      fingerprintRequest("POST", soapUrl, rerecorded),
+    );
+  });
+
+  it("keeps SOAP envelopes with different business content distinct (M2)", () => {
+    const soapUrl = "https://api.example.test/v1/soap";
+    const alpha = envelope("e-1", "2026-08-30T10:00:00Z", "n-1", "alpha");
+    const beta = envelope("e-1", "2026-08-30T10:00:00Z", "n-1", "beta");
+    expect(fingerprintRequest("POST", soapUrl, alpha)).not.toBe(
+      fingerprintRequest("POST", soapUrl, beta),
+    );
   });
 
   it("honors extra volatile body keys from options", () => {

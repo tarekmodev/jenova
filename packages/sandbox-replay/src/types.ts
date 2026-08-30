@@ -1,8 +1,14 @@
 /**
  * On-disk recording format. Bump RECORDING_SCHEMA_VERSION on any breaking change
- * and keep the reader able to reject (loudly) versions it does not understand.
+ * — including a fingerprint-algorithm change that would re-key existing
+ * recordings — and keep the reader able to reject (loudly) versions it does
+ * not understand.
+ *
+ * v2: XML volatile normalization added to the fingerprint (review M2) — XML
+ * bodies with volatile-named attributes/elements fingerprint differently than
+ * under v1. No recordings were ever committed under v1, so no migration.
  */
-export const RECORDING_SCHEMA_VERSION = 1;
+export const RECORDING_SCHEMA_VERSION = 2;
 
 export interface RecordedRequest {
   method: string;

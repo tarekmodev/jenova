@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fingerprintRequest } from "./fingerprint.js";
+import { scanRecordingsForCredentials } from "./guard.js";
 import { recordingPath } from "./store.js";
 import { createReplayTransport, type FetchLike } from "./transport.js";
 import type { Recording } from "./types.js";
@@ -53,7 +54,7 @@ describe("record mode", () => {
     const fingerprint = fingerprintRequest("POST", url, body);
     const raw = await readFile(recordingPath(recordingsDir, SUPPLIER, fingerprint), "utf8");
     const recording = JSON.parse(raw) as Recording;
-    expect(recording.schemaVersion).toBe(1);
+    expect(recording.schemaVersion).toBe(2);
     expect(recording.supplier).toBe(SUPPLIER);
     expect(recording.fingerprint).toBe(fingerprint);
     expect(recording.request).toMatchObject({ method: "POST", url, body });
@@ -116,6 +117,35 @@ describe("record mode", () => {
 
     const raw = await readFile(recordingPath(rawCapturesDir, SUPPLIER, fingerprint), "utf8");
     expect(raw).toContain(fakeToken);
+  });
+
+  it("returns the REAL response to the live caller; sanitization applies only to recordings/ (H3)", async () => {
+    const liveToken = "z".repeat(24);
+    const transport = createReplayTransport({
+      mode: "record",
+      supplier: SUPPLIER,
+      recordingsDir,
+      rawCapturesDir,
+      fetch: stubFetch(200, `{"access_token":"${liveToken}","ok":true}`, {
+        "content-type": "application/json",
+        "set-cookie": `sid=${liveToken}`,
+      }),
+    });
+
+    const url = "https://api.example.test/v1/session";
+    const response = await transport(url, { method: "POST", body: "{}" });
+
+    // A session/login flow depends on the live credential reaching the
+    // adapter intact — [REDACTED] here would break the next supplier call.
+    expect(await response.text()).toBe(`{"access_token":"${liveToken}","ok":true}`);
+    expect(response.headers.get("set-cookie")).toBe(`sid=${liveToken}`);
+
+    // What persists under recordings/ is redacted, and the CI guard passes.
+    const fingerprint = fingerprintRequest("POST", url, "{}");
+    const persisted = await readFile(recordingPath(recordingsDir, SUPPLIER, fingerprint), "utf8");
+    expect(persisted).not.toContain(liveToken);
+    expect(persisted).toContain("[REDACTED]");
+    expect(await scanRecordingsForCredentials(recordingsDir)).toEqual([]);
   });
 
   it("keeps the fingerprint stable when credentials rotate", async () => {

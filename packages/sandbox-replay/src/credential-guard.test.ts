@@ -112,7 +112,7 @@ describe("credential guard (runs in CI)", () => {
   it("parity: the raw bypass shapes trip the guard, their sanitized recording does not (H2)", async () => {
     const fake = "k".repeat(20);
     const raw: Recording = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       supplier: "example-supplier",
       fingerprint: "post-api-example-test-v1-things-abcdef012345",
       request: {
