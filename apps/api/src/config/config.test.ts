@@ -23,6 +23,8 @@ describe("loadApiConfig", () => {
       tenantRuntimeDsn: validEnv.JENOVA_TENANT_RUNTIME_DSN,
       offerSigningKey: validEnv.OFFER_SIGNING_KEY,
       hotelSearchBudgetMs: 8_000,
+      // No S3 block → documents deliberately disabled.
+      documents: null,
     });
     expect(Object.isFrozen(config)).toBe(true);
   });
@@ -70,6 +72,35 @@ describe("loadApiConfig", () => {
     expect(() => loadApiConfig({ ...validEnv, NODE_ENV: "staging" })).toThrowError(
       ApiConfigError,
     );
+  });
+
+  it("documents (M2 #99): a full S3 block enables documents with the typst default", () => {
+    const config = loadApiConfig({
+      ...validEnv,
+      S3_ENDPOINT: "http://localhost:9000",
+      S3_REGION: "me-south-1",
+      S3_ACCESS_KEY_ID: "jenova",
+      S3_SECRET_ACCESS_KEY: "jenova-minio",
+      S3_BUCKET: "jenova-dev",
+      S3_FORCE_PATH_STYLE: "true",
+    });
+    expect(config.documents).toEqual({
+      s3: {
+        endpoint: "http://localhost:9000",
+        region: "me-south-1",
+        accessKeyId: "jenova",
+        secretAccessKey: "jenova-minio",
+        bucket: "jenova-dev",
+        forcePathStyle: true,
+      },
+      typstBin: "typst",
+    });
+  });
+
+  it("documents: a PARTIAL S3 block fails fast naming the missing variables (all-or-nothing)", () => {
+    const partial = { ...validEnv, S3_ENDPOINT: "http://localhost:9000" };
+    expect(() => loadApiConfig(partial)).toThrowError(ApiConfigError);
+    expect(() => loadApiConfig(partial)).toThrowError(/S3_BUCKET[\s\S]*all-or-nothing/);
   });
 
   it("honors HOTEL_SEARCH_BUDGET_MS within bounds and rejects it outside them", () => {
