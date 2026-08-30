@@ -24,7 +24,7 @@ test it, and ship a reviewed PR to staging — unaided.
       replay resolver, "record this scenario first" failure mode.
 - [x] `apps/api` skeleton: NestJS bootstrap, gateway middleware chain stubs
       (host→tenant resolution, auth realm stub, entitlement check stub), health/ready.
-- [ ] Auth skeleton: session issuance/verification per realm, TOTP enrollment (full
+- [x] Auth skeleton: session issuance/verification per realm, TOTP enrollment (full
       flows land with their apps).
 - [x] Local dev: Docker Compose (Postgres, Redis, MinIO, mailpit); `.env.example` with
       supplier-credential placeholders keyed to Tarek's list.

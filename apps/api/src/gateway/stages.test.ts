@@ -1,7 +1,21 @@
-import { tenantId, type AppKey, type TenantId } from "@jenova/domain";
+import { subTenantId, tenantId, type AppKey, type TenantId } from "@jenova/domain";
 import { describe, expect, it } from "vitest";
+import {
+  InMemoryMachineKeyStore,
+  MachineAuthService,
+  signMachineCredential,
+} from "../auth/machine-auth";
+import { SessionService } from "../auth/session-service";
+import { InMemorySessionStore } from "../auth/session-store";
 import { ApiHttpError } from "./errors";
-import { createRequestContext, type RequestContext } from "./request-context";
+import {
+  createRequestContext,
+  requireMachineAuth,
+  requireRealm,
+  type RequestContext,
+  type SessionPrincipal,
+  type VerifiedSessionAuth,
+} from "./request-context";
 import {
   AuthRealmStage,
   EntitlementStage,
@@ -28,7 +42,43 @@ const directoryWithOneHost: TenantDirectory = {
 };
 
 function requestInfo(overrides: Partial<GatewayRequestInfo> = {}): GatewayRequestInfo {
-  return { host: KNOWN_HOST, authorization: null, requiredApp: null, ...overrides };
+  return {
+    host: KNOWN_HOST,
+    authorization: null,
+    requiredApp: null,
+    allowedRealms: null,
+    allowAnonymous: false,
+    ...overrides,
+  };
+}
+
+/** Real session + machine services over in-memory stores (nothing faked). */
+function authFixture(): {
+  stage: AuthRealmStage;
+  sessions: SessionService;
+  machineKeys: InMemoryMachineKeyStore;
+} {
+  const sessions = new SessionService(new InMemorySessionStore());
+  const machineKeys = new InMemoryMachineKeyStore();
+  return {
+    stage: new AuthRealmStage(sessions, new MachineAuthService(machineKeys)),
+    sessions,
+    machineKeys,
+  };
+}
+
+const AGENCY_PRINCIPAL: SessionPrincipal<"agency"> = {
+  realm: "agency",
+  userId: "user-1",
+  tenantId: KNOWN_TENANT,
+  subTenantId: subTenantId("agency-1"),
+};
+
+/** Context that already passed tenant resolution for KNOWN_HOST. */
+async function tenantResolvedContext(): Promise<RequestContext> {
+  const context = createRequestContext("req-1");
+  await new TenantResolutionStage(directoryWithOneHost).run(context, requestInfo());
+  return context;
 }
 
 function contextOf(): RequestContext {
@@ -88,10 +138,12 @@ describe("GatewayPipeline", () => {
 
 describe("assembled pipeline (context propagation)", () => {
   it("threads ONE context through all four stages, each populating its slice", async () => {
+    const { stage: authStage, sessions } = authFixture();
+    const issued = await sessions.issue(AGENCY_PRINCIPAL);
     const seenByLimiter: RequestContext[] = [];
     const pipeline = new GatewayPipeline([
       new TenantResolutionStage(directoryWithOneHost),
-      new AuthRealmStage(),
+      authStage,
       new EntitlementStage({ isInstalled: () => Promise.resolve(true) }),
       new RateLimitStage({
         check: (context): Promise<void> => {
@@ -104,15 +156,20 @@ describe("assembled pipeline (context propagation)", () => {
     const context = contextOf();
     await pipeline.run(
       context,
-      requestInfo({ authorization: "Bearer agency.opaque-credential", requiredApp: "b2b" }),
+      requestInfo({
+        authorization: `Bearer ${issued.token}`,
+        requiredApp: "b2b",
+        allowedRealms: ["agency"],
+      }),
     );
 
     expect(context.requestId).toBe("req-1");
     expect(context.tenant).toEqual({ tenantId: KNOWN_TENANT, dbName: KNOWN_DB, host: KNOWN_HOST });
     expect(context.auth).toEqual({
-      state: "unverified",
+      state: "verified",
       realm: "agency",
-      credential: "opaque-credential",
+      principal: AGENCY_PRINCIPAL,
+      sessionTokenHash: issued.tokenHash,
     });
     // The rate-limit seam saw the same, fully populated object.
     expect(seenByLimiter).toEqual([context]);
@@ -158,14 +215,8 @@ describe("normalizeHost", () => {
   });
 });
 
-describe("AuthRealmStage / parseRealmTaggedBearer", () => {
-  it("records an anonymous context when no Authorization header is sent", async () => {
-    const context = contextOf();
-    await new AuthRealmStage().run(context, requestInfo());
-    expect(context.auth).toEqual({ state: "anonymous" });
-  });
-
-  it("parses a realm-tagged bearer token as UNVERIFIED (crypto lands with #32)", () => {
+describe("parseRealmTaggedBearer", () => {
+  it("parses a realm-tagged bearer token as the UNVERIFIED intermediate", () => {
     expect(parseRealmTaggedBearer("Bearer agency.opaque-credential")).toEqual({
       state: "unverified",
       realm: "agency",
@@ -186,6 +237,218 @@ describe("AuthRealmStage / parseRealmTaggedBearer", () => {
     expect(parseRealmTaggedBearer("Bearer no-dot-at-all")).toEqual({ state: "anonymous" });
     expect(parseRealmTaggedBearer("Bearer agency.")).toEqual({ state: "anonymous" });
     expect(parseRealmTaggedBearer("Basic something")).toEqual({ state: "anonymous" });
+  });
+});
+
+describe("AuthRealmStage (verification, issue #32)", () => {
+  async function expect401(promise: Promise<unknown>): Promise<void> {
+    const error = await errorFrom(promise);
+    expect(error.getStatus()).toBe(401);
+    expect(error.code).toBe("unauthorized");
+  }
+
+  it("records an anonymous context on an @AllowAnonymous route with no header", async () => {
+    const { stage } = authFixture();
+    const context = await tenantResolvedContext();
+    await stage.run(context, requestInfo({ allowAnonymous: true }));
+    expect(context.auth).toEqual({ state: "anonymous" });
+  });
+
+  it("verifies a real issued session into a verified, realm-typed context", async () => {
+    const { stage, sessions } = authFixture();
+    const issued = await sessions.issue(AGENCY_PRINCIPAL);
+    const context = await tenantResolvedContext();
+
+    await stage.run(
+      context,
+      requestInfo({ authorization: `Bearer ${issued.token}`, allowedRealms: ["agency"] }),
+    );
+    expect(context.auth).toEqual({
+      state: "verified",
+      realm: "agency",
+      principal: AGENCY_PRINCIPAL,
+      sessionTokenHash: issued.tokenHash,
+    });
+  });
+
+  it("DEFAULT-DENY: an undecorated route is 401 for anonymous AND verified callers", async () => {
+    const { stage, sessions } = authFixture();
+    const issued = await sessions.issue(AGENCY_PRINCIPAL);
+
+    // No @RequiresRealm, no @AllowAnonymous, no credential: refused.
+    await expect401(stage.run(await tenantResolvedContext(), requestInfo()));
+    // Same route with a perfectly VALID session: still refused — a
+    // forgotten decorator is a dead route, not an open one.
+    await expect401(
+      stage.run(
+        await tenantResolvedContext(),
+        requestInfo({ authorization: `Bearer ${issued.token}` }),
+      ),
+    );
+  });
+
+  it("@AllowAnonymous still fully verifies a credential that IS presented", async () => {
+    const { stage, sessions } = authFixture();
+    const issued = await sessions.issue(AGENCY_PRINCIPAL);
+
+    // Valid token on an anonymous-allowed route: verified context.
+    const context = await tenantResolvedContext();
+    await stage.run(
+      context,
+      requestInfo({ allowAnonymous: true, authorization: `Bearer ${issued.token}` }),
+    );
+    expect(context.auth?.state).toBe("verified");
+
+    // Invalid token on the same route: 401, never downgraded to anonymous.
+    await expect401(
+      stage.run(
+        await tenantResolvedContext(),
+        requestInfo({ allowAnonymous: true, authorization: "Bearer agency.never-issued" }),
+      ),
+    );
+  });
+
+  it("@RequiresRealm takes precedence over @AllowAnonymous on the same target", async () => {
+    const { stage } = authFixture();
+    await expect401(
+      stage.run(
+        await tenantResolvedContext(),
+        requestInfo({ allowAnonymous: true, allowedRealms: ["agency"] }),
+      ),
+    );
+  });
+
+  it("refuses a never-issued credential with the one generic 401", async () => {
+    const { stage } = authFixture();
+    await expect401(
+      stage.run(
+        await tenantResolvedContext(),
+        requestInfo({ authorization: "Bearer agency.never-issued" }),
+      ),
+    );
+  });
+
+  it("fails closed: a PRESENT but malformed Authorization header is 401, not anonymous", async () => {
+    const { stage } = authFixture();
+    for (const bad of ["Bearer nosuchrealm.cred", "Bearer no-dot", "Bearer agency.", "Basic zzz"]) {
+      await expect401(
+        stage.run(await tenantResolvedContext(), requestInfo({ authorization: bad })),
+      );
+    }
+  });
+
+  it("refuses CROSS-REALM use at runtime: agency session under the corporate tag", async () => {
+    const { stage, sessions } = authFixture();
+    const issued = await sessions.issue(AGENCY_PRINCIPAL);
+    const secret = issued.token.slice("agency.".length);
+    await expect401(
+      stage.run(
+        await tenantResolvedContext(),
+        requestInfo({ authorization: `Bearer corporate.${secret}` }),
+      ),
+    );
+  });
+
+  it("refuses a revoked session (revocation is immediate — no JWT window)", async () => {
+    const { stage, sessions } = authFixture();
+    const issued = await sessions.issue(AGENCY_PRINCIPAL);
+    await sessions.revokeByHash(issued.tokenHash);
+    await expect401(
+      stage.run(
+        await tenantResolvedContext(),
+        requestInfo({ authorization: `Bearer ${issued.token}` }),
+      ),
+    );
+  });
+
+  it("enforces @RequiresRealm: right realm passes, other realms and anonymous get 401", async () => {
+    const { stage, sessions } = authFixture();
+    const issued = await sessions.issue(AGENCY_PRINCIPAL);
+    const gated = { allowedRealms: ["agency"] as const };
+
+    const okContext = await tenantResolvedContext();
+    await stage.run(okContext, requestInfo({ ...gated, authorization: `Bearer ${issued.token}` }));
+    expect(okContext.auth?.state).toBe("verified");
+
+    // Anonymous on a realm-gated route: 401.
+    await expect401(stage.run(await tenantResolvedContext(), requestInfo(gated)));
+
+    // Valid session of ANOTHER realm on the gate: 401 (no token crosses realms).
+    const machineGate = { allowedRealms: ["machine"] as const };
+    await expect401(
+      stage.run(
+        await tenantResolvedContext(),
+        requestInfo({ ...machineGate, authorization: `Bearer ${issued.token}` }),
+      ),
+    );
+  });
+
+  it("verifies machine-realm HMAC credentials via the key store", async () => {
+    const { stage, machineKeys } = authFixture();
+    machineKeys.putKey({
+      keyId: "key-1",
+      secret: "structural-shared-secret",
+      tenantId: KNOWN_TENANT,
+      subTenantId: null,
+      revoked: false,
+    });
+    const timestampSeconds = Math.floor(Date.now() / 1000);
+    const credential = signMachineCredential("key-1", "structural-shared-secret", timestampSeconds);
+
+    const context = await tenantResolvedContext();
+    await stage.run(
+      context,
+      requestInfo({ authorization: `Bearer machine.${credential}`, allowedRealms: ["machine"] }),
+    );
+    expect(context.auth).toEqual({
+      state: "verified",
+      realm: "machine",
+      principal: { realm: "machine", keyId: "key-1", tenantId: KNOWN_TENANT, subTenantId: null },
+    });
+
+    // A forged signature never makes it through.
+    const forged = signMachineCredential("key-1", "wrong-secret", timestampSeconds);
+    await expect401(
+      stage.run(
+        await tenantResolvedContext(),
+        requestInfo({ authorization: `Bearer machine.${forged}` }),
+      ),
+    );
+  });
+});
+
+describe("realm-boundness is typed AND runtime (requireRealm)", () => {
+  const agencyAuth: VerifiedSessionAuth<"agency"> = {
+    state: "verified",
+    realm: "agency",
+    principal: AGENCY_PRINCIPAL,
+    sessionTokenHash: "hash",
+  };
+
+  it("narrows to the requested realm at runtime", () => {
+    expect(requireRealm(agencyAuth, "agency").principal.userId).toBe("user-1");
+  });
+
+  it("throws the generic 401 for the wrong realm, anonymous, and null", () => {
+    for (const call of [
+      () => requireRealm(agencyAuth, "corporate"),
+      () => requireRealm({ state: "anonymous" }, "agency"),
+      () => requireRealm(null, "agency"),
+      () => requireMachineAuth(agencyAuth),
+    ]) {
+      expect(call).toThrowError(ApiHttpError);
+    }
+  });
+
+  it("cross-realm use is a COMPILE error, not just a runtime check", () => {
+    const wantsCorporate = (auth: VerifiedSessionAuth<"corporate">): string =>
+      auth.principal.userId;
+    // @ts-expect-error an agency session is structurally NOT a corporate one
+    void (() => wantsCorporate(agencyAuth));
+    // @ts-expect-error an agency principal cannot claim the corporate realm
+    const impossible: SessionPrincipal<"corporate"> = AGENCY_PRINCIPAL;
+    void impossible;
+    expect(true).toBe(true);
   });
 });
 

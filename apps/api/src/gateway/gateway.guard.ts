@@ -9,9 +9,18 @@ import { Inject, Injectable, type CanActivate, type ExecutionContext } from "@ne
 import { Reflector } from "@nestjs/core";
 import type { Request } from "express";
 import type { AppKey } from "@jenova/domain";
-import { REQUIRES_APP_METADATA, SKIP_GATEWAY_METADATA } from "./decorators";
+import {
+  ALLOW_ANONYMOUS_METADATA,
+  REQUIRES_APP_METADATA,
+  REQUIRES_REALM_METADATA,
+  SKIP_GATEWAY_METADATA,
+} from "./decorators";
 import { ApiHttpError } from "./errors";
-import { getRequestContext, type RequestContextCarrier } from "./request-context";
+import {
+  getRequestContext,
+  type AuthRealm,
+  type RequestContextCarrier,
+} from "./request-context";
 import { GATEWAY_PIPELINE, GatewayPipeline } from "./stages";
 
 function headerValue(req: Request, name: string): string | null {
@@ -50,6 +59,13 @@ export class GatewayGuard implements CanActivate {
       authorization: headerValue(req, "authorization"),
       requiredApp:
         this.reflector.getAllAndOverride<AppKey>(REQUIRES_APP_METADATA, targets) ?? null,
+      allowedRealms:
+        this.reflector.getAllAndOverride<readonly AuthRealm[]>(
+          REQUIRES_REALM_METADATA,
+          targets,
+        ) ?? null,
+      allowAnonymous:
+        this.reflector.getAllAndOverride<boolean>(ALLOW_ANONYMOUS_METADATA, targets) === true,
     });
     return true;
   }
