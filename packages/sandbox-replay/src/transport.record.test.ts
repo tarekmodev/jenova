@@ -54,7 +54,7 @@ describe("record mode", () => {
     const fingerprint = fingerprintRequest("POST", url, body);
     const raw = await readFile(recordingPath(recordingsDir, SUPPLIER, fingerprint), "utf8");
     const recording = JSON.parse(raw) as Recording;
-    expect(recording.schemaVersion).toBe(1);
+    expect(recording.schemaVersion).toBe(2);
     expect(recording.supplier).toBe(SUPPLIER);
     expect(recording.fingerprint).toBe(fingerprint);
     expect(recording.request).toMatchObject({ method: "POST", url, body });

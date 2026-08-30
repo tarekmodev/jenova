@@ -13,7 +13,15 @@ transport with `createReplayTransport(...)`, a fetch-compatible function:
   its next live call and push auth traffic around the recorder, past sanitization.
 - Recordings are keyed by a **normalized request fingerprint**: method + URL with
   volatile params (timestamps, nonces, correlation ids) normalized + a canonicalized
-  body hash — so a re-run of the same scenario resolves to the same file.
+  body hash — so a re-run of the same scenario resolves to the same file. The same
+  volatile name list applies to JSON body keys and — matched by local name — to XML
+  attributes and leaf elements (OTA-style `EchoToken`/`TimeStamp` protocol noise), so
+  re-recording SOAP flows does not orphan recordings: presence stays in the hash,
+  values are normalized to `~`.
+- `schemaVersion` is **2**: adding XML volatile normalization changed the fingerprint
+  algorithm (XML bodies carrying volatile-named attributes/elements would key
+  differently than under v1). No recordings were ever committed under v1, so there is
+  no migration — the reader rejects unknown versions loudly with "re-record it".
 - The format is deterministic and human-diffable: `schemaVersion`, fixed key order,
   alphabetized lowercase headers, 2-space indent. Wall-clock timestamps stay out of
   recordings (only `timings.durationMs`) so re-recording diffs quietly; the weekly
