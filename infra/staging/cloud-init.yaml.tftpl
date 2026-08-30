@@ -1,0 +1,26 @@
+#cloud-config
+# Staging VM provisioning (docs/10: single VM, production-shaped). Installs
+# Docker + the compose plugin and lays down the /opt/jenova deploy unit; the
+# first actual deploy comes from .github/workflows/deploy-staging.yml.
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+
+write_files:
+  - path: /opt/jenova/docker-compose.yml
+    permissions: "0644"
+    content: |
+      ${indent(6, compose)}
+  - path: /opt/jenova/fetch-env.sh
+    permissions: "0755"
+    content: |
+      ${indent(6, fetch_env)}
+  - path: /opt/jenova/deploy.sh
+    permissions: "0755"
+    content: |
+      ${indent(6, deploy)}
+
+runcmd:
+  - snap install aws-cli --classic
+  - systemctl enable --now docker
