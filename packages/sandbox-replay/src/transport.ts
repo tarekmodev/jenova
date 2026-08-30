@@ -1,4 +1,5 @@
 import { fingerprintRequest, type FingerprintOptions } from "./fingerprint.js";
+import { DEFAULT_REDACTED_PARAMS, sanitizeRecording, type RedactionConfig } from "./sanitize.js";
 import {
   DEFAULT_RAW_CAPTURES_DIR,
   DEFAULT_RECORDINGS_DIR,
@@ -20,6 +21,21 @@ export interface ReplayTransportConfig {
   /** Underlying transport for record mode; defaults to global fetch. */
   fetch?: FetchLike;
   fingerprint?: FingerprintOptions;
+  /** Extra redactions on top of the safe defaults — never instead of them. */
+  redact?: RedactionConfig;
+}
+
+/**
+ * Credential params must be volatile for fingerprinting too: they never leak
+ * into the hash input, and rotating sandbox credentials cannot orphan
+ * recordings.
+ */
+function fingerprintOptions(config: ReplayTransportConfig): FingerprintOptions {
+  const credentialParams = [...DEFAULT_REDACTED_PARAMS, ...(config.redact?.queryParams ?? [])];
+  return {
+    volatileParams: [...credentialParams, ...(config.fingerprint?.volatileParams ?? [])],
+    volatileBodyKeys: [...credentialParams, ...(config.fingerprint?.volatileBodyKeys ?? [])],
+  };
 }
 
 function requestBodyText(init: RequestInit | undefined): string | null {
@@ -73,7 +89,7 @@ export function createReplayTransport(config: ReplayTransportConfig): FetchLike 
     const method = (init?.method ?? "GET").toUpperCase();
     const urlText = url instanceof URL ? url.toString() : url;
     const requestBody = requestBodyText(init);
-    const fingerprint = fingerprintRequest(method, urlText, requestBody, config.fingerprint);
+    const fingerprint = fingerprintRequest(method, urlText, requestBody, fingerprintOptions(config));
 
     const startedAt = new Date();
     const started = performance.now();
@@ -100,16 +116,21 @@ export function createReplayTransport(config: ReplayTransportConfig): FetchLike 
       timings: { durationMs },
     };
 
+    // Quarantine: the unsanitized capture only ever lands in raw-captures/
+    // (gitignored); recordings/ receives the sanitized version exclusively.
     await writeRecordingFile(rawCapturesDir, capture);
 
-    const recording: Recording = {
-      schemaVersion: capture.schemaVersion,
-      supplier: capture.supplier,
-      fingerprint: capture.fingerprint,
-      request: capture.request,
-      response: capture.response,
-      timings: capture.timings,
-    };
+    const recording: Recording = sanitizeRecording(
+      {
+        schemaVersion: capture.schemaVersion,
+        supplier: capture.supplier,
+        fingerprint: capture.fingerprint,
+        request: capture.request,
+        response: capture.response,
+        timings: capture.timings,
+      },
+      config.redact,
+    );
     await writeRecordingFile(recordingsDir, recording);
 
     // Hand the caller a reconstruction of what was recorded, so development

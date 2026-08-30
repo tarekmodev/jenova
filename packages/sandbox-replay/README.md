@@ -18,6 +18,24 @@ transport with `createReplayTransport(...)`, a fetch-compatible function:
 Record mode never runs in CI against the network — look-to-book is a commercial
 obligation. CI resolves from recordings only.
 
+## Sanitization and quarantine
+
+Before anything persists to `recordings/`, `sanitizeRecording` strips every piece of
+credential material: auth/api-key/signature/cookie headers, credential query params and
+basic-auth userinfo in URLs, credential-named JSON keys and XML elements/attributes,
+and bearer/basic/JWT-shaped strings inside any text value — all replaced with
+`[REDACTED]`. The redaction list is configurable per adapter (extra names merge **on
+top of** the safe defaults, never instead of them). Credential params are also treated
+as volatile for fingerprinting, so credentials never enter the hash input and rotating
+sandbox credentials cannot orphan recordings.
+
+The unsanitized capture only ever lands in `raw-captures/`, which is gitignored at the
+repo root — raw captures never leave this package's directory and are never committed.
+
+`credential-guard.test.ts` is the CI gate: it scans every committed recording for
+credential patterns (bearer tokens, basic-auth base64, JWTs, common key shapes) and
+fails the build on any match.
+
 ## The data rule (CLAUDE.md rule 5)
 
 **No mock or fabricated supplier data — ever.** This package is the *mechanism*, so its

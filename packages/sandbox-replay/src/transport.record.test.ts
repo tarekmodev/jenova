@@ -88,6 +88,52 @@ describe("record mode", () => {
     expect(headerNames).toContain("x-a");
   });
 
+  it("sanitizes recordings/ while the raw capture stays quarantined in raw-captures/", async () => {
+    const fakeToken = "y".repeat(24);
+    const transport = createReplayTransport({
+      mode: "record",
+      supplier: SUPPLIER,
+      recordingsDir,
+      rawCapturesDir,
+      fetch: stubFetch(200, `{"access_token":"${fakeToken}","ok":true}`, {
+        "set-cookie": `sid=${fakeToken}`,
+      }),
+    });
+
+    const url = `https://api.example.test/v1/items?apiKey=${fakeToken}&q=alpha`;
+    await transport(url, {
+      method: "GET",
+      headers: { authorization: `Bearer ${fakeToken}` },
+    });
+
+    const fingerprint = fingerprintRequest("GET", url, null, {
+      volatileParams: ["apiKey"],
+    });
+    const recording = await readFile(recordingPath(recordingsDir, SUPPLIER, fingerprint), "utf8");
+    expect(recording).not.toContain(fakeToken);
+    expect(recording).toContain("[REDACTED]");
+    expect(recording).toContain("q=alpha");
+
+    const raw = await readFile(recordingPath(rawCapturesDir, SUPPLIER, fingerprint), "utf8");
+    expect(raw).toContain(fakeToken);
+  });
+
+  it("keeps the fingerprint stable when credentials rotate", async () => {
+    const transport = createReplayTransport({
+      mode: "record",
+      supplier: SUPPLIER,
+      recordingsDir,
+      rawCapturesDir,
+      fetch: stubFetch(200, '{"ok":true}', {}),
+    });
+    await transport("https://api.example.test/v1/items?q=alpha&token=oldoldoldoldold1");
+    await transport("https://api.example.test/v1/items?q=alpha&token=newnewnewnewnew2");
+
+    const supplierDir = join(recordingsDir, SUPPLIER);
+    const { readdir } = await import("node:fs/promises");
+    expect(await readdir(supplierDir)).toHaveLength(1);
+  });
+
   it("refuses to record over the network under CI", () => {
     const original = process.env["CI"];
     process.env["CI"] = "true";
