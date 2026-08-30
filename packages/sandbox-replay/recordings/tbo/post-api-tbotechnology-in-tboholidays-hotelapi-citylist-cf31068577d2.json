@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "supplier": "tbo",
+  "fingerprint": "post-api-tbotechnology-in-tboholidays-hotelapi-citylist-cf31068577d2",
+  "request": {
+    "method": "POST",
+    "url": "https://api.tbotechnology.in/TBOHolidays_HotelAPI/CityList",
+    "headers": {
+      "accept": "application/json",
+      "authorization": "[REDACTED]",
+      "content-type": "application/json"
+    },
+    "body": "{\"CountryCode\":\"SA\"}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "connection": "keep-alive",
+      "content-encoding": "gzip",
+      "content-length": "921",
+      "content-type": "application/json",
+      "date": "Sun, 30 Aug 2026 15:56:05 GMT",
+      "sessionid": "[REDACTED]",
+      "vary": "Accept-Encoding"
+    },
+    "body": "{\"Status\":{\"Code\":200,\"Description\":\"Success\"},\"CityList\":[{\"Code\":\"100218\",\"Name\":\"Abha\"},{\"Code\":\"160981\",\"Name\":\"Afif\"},{\"Code\":\"269830\",\"Name\":\"Ahad Rafidah\"},{\"Code\":\"392410\",\"Name\":\"Al Aziziyah\"},{\"Code\":\"100164\",\"Name\":\"Al Bahah\"},{\"Code\":\"100813\",\"Name\":\"Al Bukayriyah\"},{\"Code\":\"418212\",\"Name\":\"Al Hofuf\"},{\"Code\":\"100491\",\"Name\":\"Al Khobar\"},{\"Code\":\"160982\",\"Name\":\"Al Lith,   Makkah\"},{\"Code\":\"155776\",\"Name\":\"Al Madinah Province\"},{\"Code\":\"160980\",\"Name\":\"Al Majma'ah\"},{\"Code\":\"155778\",\"Name\":\"Al Qassim\"},{\"Code\":\"160726\",\"Name\":\"Al Qunfudhah,   Makkah\"},{\"Code\":\"105149\",\"Name\":\"Al Wajh\"},{\"Code\":\"155772\",\"Name\":\"Al-Ahsa\"},{\"Code\":\"100304\",\"Name\":\"Al-Hofuf\"},{\"Code\":\"105080\",\"Name\":\"Al-Kharj\"},{\"Code\":\"100977\",\"Name\":\"AlUla\"},{\"Code\":\"418319\",\"Name\":\"Amala,   Tabuk Province\"},{\"Code\":\"396149\",\"Name\":\"Ar Rass\"},{\"Code\":\"150693\",\"Name\":\"Arar\"},{\"Code\":\"155774\",\"Name\":\"Asir\"},{\"Code\":\"418242\",\"Name\":\"Baish,   Jizan Province\"},{\"Code\":\"407518\",\"Name\":\"Baljurashi\"},{\"Code\":\"112062\",\"Name\":\"Buraydah\"},{\"Code\":\"116137\",\"Name\":\"Dammam\"},{\"Code\":\"116182\",\"Name\":\"Dhahran\"},{\"Code\":\"418106\",\"Name\":\"Dumat al-Jandal\"},{\"Code\":\"117881\",\"Name\":\"Farasan Island\"},{\"Code\":\"151377\",\"Name\":\"Gassim\"},{\"Code\":\"119783\",\"Name\":\"Gizan / Jizan\"},{\"Code\":\"151001\",\"Name\":\"Gurayat\"},{\"Code\":\"120076\",\"Name\":\"Hafar Al-Batin\"},{\"Code\":\"418206\",\"Name\":\"Hafr Al Baten\"},{\"Code\":\"120451\",\"Name\":\"Hail\"},{\"Code\":\"417936\",\"Name\":\"Hanak\"},{\"Code\":\"378145\",\"Name\":\"Haradh\"},{\"Code\":\"418281\",\"Name\":\"Hegra\"},{\"Code\":\"122187\",\"Name\":\"Jeddah\"},{\"Code\":\"151466\",\"Name\":\"Jouf\"},{\"Code\":\"122789\",\"Name\":\"Jubail\"},{\"Code\":\"114096\",\"Name\":\"KHAMIS MUSHAIT\"},{\"Code\":\"104104\",\"Name\":\"Khafji\"},{\"Code\":\"417544\",\"Name\":\"Khuff\"},{\"Code\":\"103965\",\"Name\":\"King Abdullah Economic City\"},{\"Code\":\"127340\",\"Name\":\"Madinah\"},{\"Code\":\"127891\",\"Name\":\"Makkah/Mecca\"},{\"Code\":\"129446\",\"Name\":\"Nadschran\"},{\"Code\":\"417572\",\"Name\":\"Najran\"},{\"Code\":\"150906\",\"Name\":\"Nejran\"},{\"Code\":\"289876\",\"Name\":\"Neom Bay (NUM)\"},{\"Code\":\"151316\",\"Name\":\"Qaisumah\"},{\"Code\":\"103469\",\"Name\":\"Qurayyat\"},{\"Code\":\"103093\",\"Name\":\"Rabigh\"},{\"Code\":\"151317\",\"Name\":\"Rafha\"},{\"Code\":\"256963\",\"Name\":\"Ras Tanura\"},{\"Code\":\"147536\",\"Name\":\"Riyadh\"},{\"Code\":\"273156\",\"Name\":\"Sakaka\"},{\"Code\":\"106312\",\"Name\":\"Shaqraa\"},{\"Code\":\"205075\",\"Name\":\"Sharma\"},{\"Code\":\"150939\",\"Name\":\"Sharurah\"},{\"Code\":\"139889\",\"Name\":\"Tabuk\"},{\"Code\":\"139663\",\"Name\":\"Taif\"},{\"Code\":\"417825\",\"Name\":\"Test City\"},{\"Code\":\"418231\",\"Name\":\"The Red Sea\"},{\"Code\":\"160883\",\"Name\":\"Thuwal\"},{\"Code\":\"151034\",\"Name\":\"Turaif\"},{\"Code\":\"407610\",\"Name\":\"Umluj\"},{\"Code\":\"299920\",\"Name\":\"Umm Lajj\"},{\"Code\":\"148373\",\"Name\":\"Unayzah\"},{\"Code\":\"306276\",\"Name\":\"Wadi-Ad-Dawasir\"},{\"Code\":\"151503\",\"Name\":\"Wedjh\"},{\"Code\":\"143794\",\"Name\":\"Yanbu\"},{\"Code\":\"418207\",\"Name\":\"hafr al batin\"}]}"
+  },
+  "timings": {
+    "durationMs": 340
+  }
+}

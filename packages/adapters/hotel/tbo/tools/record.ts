@@ -10,7 +10,8 @@
  *   pnpm --filter @jenova/adapter-hotel-tbo record <scenario> [args...]
  */
 
-import { TboClient, createTboTransport, type TboEndpoint } from "../src/index";
+import { createTboHotelAdapter, TboClient, createTboTransport, type TboEndpoint } from "../src/index";
+import { RECORDED_SEARCH_QUERY } from "../src/recorded-scenarios";
 import { loadRepoEnv, recordingContext, type RecordingContextOverrides } from "./env";
 
 loadRepoEnv();
@@ -44,16 +45,17 @@ async function main(): Promise<void> {
     case "hotelDetails":
       return call("hotelDetails", { Hotelcodes: args[0], Language: "EN" });
     case "search": {
-      const [hotelCodes, checkIn, checkOut, adults] = args;
-      return call("search", {
-        CheckIn: checkIn,
-        CheckOut: checkOut,
-        HotelCodes: hotelCodes,
-        GuestNationality: "SA",
-        PaxRooms: [{ Adults: Number(adults ?? 1), Children: 0, ChildrenAges: [] }],
-        ResponseTime: 23.0,
-        IsDetailedResponse: true,
-      });
+      // The canonical recorded scenario, through the real adapter, so the
+      // recording fingerprint always matches what the adapter sends.
+      const adapter = createTboHotelAdapter({ transport: createTboTransport({ mode: "record" }) });
+      const offers = await adapter.search(recordingContext(), RECORDED_SEARCH_QUERY);
+      console.log(`search -> ${offers.length} offers`);
+      for (const offer of offers.slice(0, 5)) {
+        console.log(
+          `${offer.canonicalPropertyId} ${offer.boardBasis} ${offer.net.amount} ${offer.net.currency} refundable=${offer.cancellationPolicy.refundable} ${offer.supplierRoomName}`,
+        );
+      }
+      return;
     }
     default:
       throw new Error(`unknown scenario: ${String(scenario)}`);
