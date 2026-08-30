@@ -21,6 +21,15 @@ const apiEnvSchema = z.object({
   // them now keeps staging/production fail-fast instead of half-up.
   CONTROL_PLANE_DATABASE_URL: z.url(),
   REDIS_URL: z.url(),
+  // Least-privilege runtime DSN for the tenant resolver (M1 offer store —
+  // the first api surface that opens tenant connections).
+  JENOVA_TENANT_RUNTIME_DSN: z.url(),
+  // HMAC-SHA256 key behind every offer's signed price hash (CLAUDE.md
+  // rule 8). ≥ 32 chars of real entropy. ROTATION: there is ONE active key —
+  // rotating it fails verification of every outstanding offer token, so
+  // in-flight shoppers re-search (offers live minutes; rotation costs one
+  // brief re-search window, never money). See offers/signing.ts.
+  OFFER_SIGNING_KEY: z.string().min(32),
 });
 
 export interface ApiConfig {
@@ -28,6 +37,8 @@ export interface ApiConfig {
   readonly port: number;
   readonly controlPlaneDatabaseUrl: string;
   readonly redisUrl: string;
+  readonly tenantRuntimeDsn: string;
+  readonly offerSigningKey: string;
 }
 
 /** Nest injection token for the loaded {@link ApiConfig}. */
@@ -57,5 +68,7 @@ export function loadApiConfig(env: Readonly<Record<string, string | undefined>>)
     port: parsed.data.API_PORT,
     controlPlaneDatabaseUrl: parsed.data.CONTROL_PLANE_DATABASE_URL,
     redisUrl: parsed.data.REDIS_URL,
+    tenantRuntimeDsn: parsed.data.JENOVA_TENANT_RUNTIME_DSN,
+    offerSigningKey: parsed.data.OFFER_SIGNING_KEY,
   });
 }

@@ -20,6 +20,7 @@
     "paths": {
       "@jenova/domain": ["./packages/domain/src/index.ts"],
       "@jenova/db": ["./packages/db/src/index.ts"],
+      "@jenova/db/testing": ["./packages/db/src/testing.ts"],
       "@jenova/supplier-sdk": ["./packages/supplier-sdk/src/index.ts"],
       "@jenova/supplier-sdk/testing": ["./packages/supplier-sdk/src/testing/index.ts"],
       "@jenova/sandbox-replay": ["./packages/sandbox-replay/src/index.ts"],

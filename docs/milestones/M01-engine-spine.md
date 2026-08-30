@@ -16,11 +16,11 @@ recorded traffic powering CI. No UI yet beyond API endpoints.
       (single supplier for now, N-ready), hard time budget, SSE streaming, availability
       cache keyed (supplier, property, dates, occupancy, nationality), static-content
       cache.
-- [ ] **Pricing engine** (`api/pricing`): pure resolve(net, context) → sell + breakdown;
+- [x] **Pricing engine** (`api/pricing`): pure resolve(net, context) → sell + breakdown;
       most-specific-wins MarkupRule resolution; fired-rule id stored on Offer;
       property-based tests (never negative margin unless rule explicitly allows, VAT
       breakdown correctness, FX with stored rate + buffer).
-- [ ] **Offer store**: TTL cache + signed price hash; `check` revalidation flow with
+- [x] **Offer store**: TTL cache + signed price hash; `check` revalidation flow with
       price-delta surfacing.
 - [ ] **Booking engine** (`api/hotel-booking`): BookingItem state machine runner —
       atomic transition = validate legality + persist + ledger postings + AuditEvent +
