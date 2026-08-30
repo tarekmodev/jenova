@@ -27,6 +27,31 @@ export {
 } from "./control-plane/schema";
 
 export {
+  SUPPLIER_ENVIRONMENTS,
+  type SupplierEnvironment,
+  AGENCY_STATUSES,
+  type AgencyStatus,
+  MARKUP_VALUE_TYPES,
+  type MarkupValueType,
+  PAYMENT_STATES,
+  type PaymentState,
+  LEDGER_ACCOUNT_TYPES,
+  type LedgerAccountType,
+  AUDIT_ACTOR_TYPES,
+  type AuditActorType,
+  supplierAccounts,
+  agencies,
+  agencyUsers,
+  markupRules,
+  offers,
+  bookings,
+  bookingItems,
+  ledgerAccounts,
+  journalEntries,
+  auditEvents,
+} from "./tenant/schema";
+
+export {
   TenantNotFoundError,
   TenantNotProvisionedError,
   TenantAlreadyProvisionedError,
