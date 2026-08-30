@@ -3,6 +3,7 @@ import { DEFAULT_REDACTED_PARAMS, sanitizeRecording, type RedactionConfig } from
 import {
   DEFAULT_RAW_CAPTURES_DIR,
   DEFAULT_RECORDINGS_DIR,
+  readRecordingFile,
   writeRecordingFile,
 } from "./store.js";
 import { RECORDING_SCHEMA_VERSION, type RawCapture, type Recording } from "./types.js";
@@ -10,7 +11,24 @@ import { RECORDING_SCHEMA_VERSION, type RawCapture, type Recording } from "./typ
 /** Shape adapters program against — a (url, init) subset of fetch/undici. */
 export type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>;
 
-export type ReplayMode = "record";
+export type ReplayMode = "record" | "replay";
+
+/**
+ * A fingerprint with no recording. Always thrown, never recovered from — a
+ * silent fallback or generated response would put fabricated supplier data
+ * into the test suite (CLAUDE.md rule 5).
+ */
+export class ReplayMissError extends Error {
+  readonly fingerprint: string;
+  readonly supplier: string;
+
+  constructor(fingerprint: string, supplier: string) {
+    super(`record this scenario first: ${fingerprint} (supplier ${supplier})`);
+    this.name = "ReplayMissError";
+    this.fingerprint = fingerprint;
+    this.supplier = supplier;
+  }
+}
 
 export interface ReplayTransportConfig {
   mode: ReplayMode;
@@ -75,6 +93,25 @@ function reconstructResponse(recording: Recording): Response {
 export function createReplayTransport(config: ReplayTransportConfig): FetchLike {
   const recordingsDir = config.recordingsDir ?? DEFAULT_RECORDINGS_DIR;
   const rawCapturesDir = config.rawCapturesDir ?? DEFAULT_RAW_CAPTURES_DIR;
+
+  if (config.mode === "replay") {
+    // Replay resolves from recordings ONLY. No network, no fallback, no
+    // generated responses — a miss fails loudly with the fingerprint to
+    // record (docs/09-testing.md).
+    return async (url, init) => {
+      const method = (init?.method ?? "GET").toUpperCase();
+      const urlText = url instanceof URL ? url.toString() : url;
+      const fingerprint = fingerprintRequest(
+        method,
+        urlText,
+        requestBodyText(init),
+        fingerprintOptions(config),
+      );
+      const recording = await readRecordingFile(recordingsDir, config.supplier, fingerprint);
+      if (recording === undefined) throw new ReplayMissError(fingerprint, config.supplier);
+      return reconstructResponse(recording);
+    };
+  }
 
   // Only an injected transport may record under CI — the network path would
   // hit live sandboxes, and look-to-book is a commercial obligation.

@@ -40,6 +40,7 @@ export {
 } from "./guard.js";
 export {
   createReplayTransport,
+  ReplayMissError,
   type FetchLike,
   type ReplayMode,
   type ReplayTransportConfig,

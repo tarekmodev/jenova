@@ -15,6 +15,11 @@ transport with `createReplayTransport(...)`, a fetch-compatible function:
   recordings (only `timings.durationMs`) so re-recording diffs quietly; the weekly
   drift job should ignore `timings` when diffing.
 
+- **replay** (CI and every automated test run): the transport resolves from
+  `recordings/` only — no network, ever. A fingerprint miss throws
+  `ReplayMissError`: `record this scenario first: <fingerprint> (supplier <name>)`.
+  Never a silent fallback, never a generated response.
+
 Record mode never runs in CI against the network — look-to-book is a commercial
 obligation. CI resolves from recordings only.
 
