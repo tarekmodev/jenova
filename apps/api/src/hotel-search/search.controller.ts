@@ -27,14 +27,10 @@ import { Body, Controller, Inject, Post, Req, Res } from "@nestjs/common";
 import { ApiOperation, ApiProduces, ApiResponse, ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { z } from "zod";
-import { LOCALES, type Money } from "@jenova/domain";
+import { LOCALES, type Money, type SalesChannel, type SubTenantId } from "@jenova/domain";
 import { RequiresRealm } from "../gateway/decorators";
 import { ApiHttpError } from "../gateway/errors";
-import {
-  getRequestContext,
-  requireRealm,
-  type RequestContextCarrier,
-} from "../gateway/request-context";
+import { getRequestContext, type RequestContextCarrier } from "../gateway/request-context";
 import {
   HOTEL_SEARCH_SERVICE,
   type HotelSearchEvent,
@@ -179,7 +175,7 @@ export class HotelSearchController {
   ) {}
 
   @Post()
-  @RequiresRealm("agency")
+  @RequiresRealm("agency", "tenant_staff")
   @ApiOperation({
     summary: "Stream a hotel search across the tenant's enabled suppliers (SSE)",
     description:
@@ -286,7 +282,22 @@ export class HotelSearchController {
       // The gateway chain populates both before any handler runs.
       throw ApiHttpError.internal("request context is missing its tenant");
     }
-    const auth = requireRealm(context.auth, "agency");
+    // Per-surface differences are PARAMETERS, never forks (rule 2): the
+    // agency portal searches as b2b under its sub-tenant gate; the staff
+    // search console searches as the internal channel with no sub-tenant
+    // (staff-chosen sub-tenant attribution arrives with book-on-behalf).
+    const auth = context.auth;
+    if (auth === null || auth.state !== "verified") {
+      throw ApiHttpError.unauthorized();
+    }
+    let scope: { subTenantId: SubTenantId | null; channel: SalesChannel };
+    if (auth.realm === "agency") {
+      scope = { subTenantId: auth.principal.subTenantId, channel: "b2b" };
+    } else if (auth.realm === "tenant_staff") {
+      scope = { subTenantId: null, channel: "internal" };
+    } else {
+      throw ApiHttpError.unauthorized();
+    }
     const parsed = searchBody.safeParse(rawBody);
     if (!parsed.success) {
       throw new ApiHttpError(
@@ -309,8 +320,8 @@ export class HotelSearchController {
       nationality: body.nationality,
       currency: body.currency,
       locale: body.locale,
-      subTenantId: auth.principal.subTenantId,
-      channel: "b2b",
+      subTenantId: scope.subTenantId,
+      channel: scope.channel,
     };
 
     // Open the stream only once the request is fully validated — everything

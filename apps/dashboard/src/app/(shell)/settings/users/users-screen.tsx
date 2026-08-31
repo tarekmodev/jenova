@@ -330,6 +330,7 @@ function InviteDialog(props: {
                 id={fieldId}
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
+                data-testid="invite-name"
                 size="small"
                 fullWidth
               />
@@ -342,6 +343,7 @@ function InviteDialog(props: {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
+                data-testid="invite-email"
                 size="small"
                 fullWidth
               />

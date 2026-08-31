@@ -7,3 +7,7 @@ coverage/
 !.env.example
 packages/sandbox-replay/raw-captures/
 *.tsbuildinfo
+e2e/.tmp/
+e2e/screenshots/
+test-results/
+playwright-report/

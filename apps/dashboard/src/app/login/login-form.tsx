@@ -76,6 +76,7 @@ export function LoginForm(): ReactNode {
               id={fieldId}
               type="email"
               autoComplete="email"
+              data-testid="login-email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               fullWidth
@@ -89,6 +90,7 @@ export function LoginForm(): ReactNode {
               id={fieldId}
               type="password"
               autoComplete="current-password"
+              data-testid="login-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               fullWidth
@@ -103,6 +105,7 @@ export function LoginForm(): ReactNode {
                 id={fieldId}
                 inputMode="numeric"
                 autoComplete="one-time-code"
+                data-testid="login-totp"
                 value={totpCode}
                 onChange={(event) => setTotpCode(event.target.value)}
                 fullWidth
@@ -111,7 +114,7 @@ export function LoginForm(): ReactNode {
             )}
           </FormField>
         )}
-        <Button type="submit" variant="contained" disabled={busy} fullWidth>
+        <Button type="submit" variant="contained" disabled={busy} fullWidth data-testid="login-submit">
           {totpStep ? t("verify") : t("signIn")}
         </Button>
       </Stack>

@@ -9,11 +9,14 @@ import { s3ObjectStoreFromEnv } from "@jenova/connectors";
 import type { TenantDbResolver } from "@jenova/db";
 import { AuthModule } from "../auth/auth.module";
 import { ConfigModule } from "../config/config.module";
+import { HotelBookingModule } from "../hotel-booking/hotel-booking.module";
 import { OffersModule } from "../offers/offers.module";
 import type { SecretBox } from "../tenancy/secret-box";
 import { SECRET_BOX } from "../tenancy/secret-box";
 import { TENANT_DB_RESOLVER, TenantDbModule } from "../tenancy/tenant-db.module";
 import { BrandingController, OBJECT_STORE } from "./branding.controller";
+import { StaffBookingsController } from "./staff-bookings.controller";
+import { StaffEscalationsController } from "./staff-escalations.controller";
 import { StaffPolicyController, StaffUsersController } from "./staff-users.controller";
 import {
   DrizzleSupplierAccountAdmin,
@@ -22,12 +25,14 @@ import {
 import { SupplierAccountsController } from "./supplier-accounts.controller";
 
 @Module({
-  imports: [ConfigModule, AuthModule, TenantDbModule, OffersModule],
+  imports: [ConfigModule, AuthModule, TenantDbModule, OffersModule, HotelBookingModule],
   controllers: [
     StaffUsersController,
     StaffPolicyController,
     SupplierAccountsController,
     BrandingController,
+    StaffBookingsController,
+    StaffEscalationsController,
   ],
   providers: [
     {

@@ -52,6 +52,126 @@
   "appSection": {
     "placeholder": "This app is installed. Its dashboard section arrives with its milestone."
   },
+  "workspace": {
+    "bookings": {
+      "title": "Bookings",
+      "subtitle": "Every booking across every surface",
+      "columns": {
+        "reference": "Reference",
+        "state": "State",
+        "channel": "Channel",
+        "supplier": "Supplier",
+        "sell": "Sell",
+        "created": "Created"
+      },
+      "filters": {
+        "state": "State",
+        "supplier": "Supplier",
+        "from": "From",
+        "to": "To",
+        "any": "Any",
+        "apply": "Apply"
+      },
+      "empty": {
+        "title": "No bookings yet",
+        "description": "Bookings from every surface appear here as they are made"
+      }
+    },
+    "detail": {
+      "channel": "Channel",
+      "paymentState": "Payment",
+      "net": "Net",
+      "sell": "Sell",
+      "cancellationPolicy": "Cancellation policy",
+      "history": "State history",
+      "historySubtitle": "From the append-only audit trail",
+      "historyEmpty": "No events recorded",
+      "ledger": "Ledger postings",
+      "ledgerSubtitle": "Double-entry postings of this booking — read from the ledger, never recomputed",
+      "ledgerEmpty": "No postings yet",
+      "ledgerColumns": { "account": "Account", "memo": "Memo", "amount": "Amount", "postedAt": "Posted" },
+      "documents": "Documents",
+      "documentsEmpty": "No documents yet",
+      "documentsNote": "Vouchers and invoices appear here when document generation ships"
+    },
+    "queue": {
+      "title": "Manual intervention",
+      "subtitle": "Items automation could not safely resolve",
+      "age": "Age",
+      "retryPoll": "Retry supplier poll",
+      "markResolved": "Mark resolved",
+      "openBooking": "Open booking",
+      "resolveTitle": "Mark this escalation resolved",
+      "resolveNote": "What was done",
+      "cancel": "Cancel",
+      "resolved": "Escalation resolved",
+      "outcomes": {
+        "transitioned_confirmed": "The supplier confirmed the booking — item settled",
+        "transitioned_cancelled": "The supplier reports it cancelled — item settled",
+        "transitioned_failed": "The supplier reports it failed — item settled",
+        "still_pending": "Still pending at the supplier — no change",
+        "retrieve_failed": "The supplier could not be reached",
+        "escalated": "Still escalated",
+        "conflict_skipped": "Another process settled the item first",
+        "error": "The retry failed unexpectedly"
+      },
+      "empty": {
+        "title": "Nothing needs intervention",
+        "description": "Escalated bookings appear here with the exact decision needed"
+      },
+      "errors": { "actionFailed": "The action could not be completed" }
+    },
+    "search": {
+      "title": "Search console",
+      "subtitle": "Staff-side hotel search for phone-in and walk-in business",
+      "propertyIds": "Property ids",
+      "propertyIdsHint": "Canonical property ids, comma-separated (e.g. tbo:1010062) — destination search arrives with the mapping service",
+      "checkIn": "Check-in",
+      "checkOut": "Check-out",
+      "adults": "Adults",
+      "nationality": "Nationality",
+      "nationalityHint": "ISO code — rates vary by it",
+      "currency": "Currency",
+      "search": "Search",
+      "streaming": "Searching suppliers…",
+      "budgetExhausted": "Partial results — some suppliers did not answer within the time budget",
+      "streamFailed": "The search stream failed — try again",
+      "refundable": "Refundable",
+      "nonRefundable": "Non-refundable",
+      "openInPortal": "Open in portal",
+      "openInPortalHint": "Booking on behalf completes in the Agent Portal in this milestone",
+      "empty": { "title": "No availability", "description": "No supplier returned rates for this search" },
+      "errors": { "form": "Fill property ids, dates and a 2-letter nationality" }
+    }
+  },
+  "bookingStates": {
+    "quoted": "Quoted",
+    "reserved": "Reserved",
+    "pending_confirmation": "Pending confirmation",
+    "confirmed": "Confirmed",
+    "issued": "Issued",
+    "amendment_pending": "Amendment pending",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "failed": "Failed"
+  },
+  "policy": {
+    "free": "Free cancellation",
+    "nonRefundable": "Non-refundable",
+    "until": "until",
+    "from": "from",
+    "now": "now"
+  },
+  "supplierErrors": {
+    "sold_out": "Sold out",
+    "price_changed": "Price changed",
+    "invalid_request": "Invalid request",
+    "supplier_timeout": "Supplier timeout",
+    "supplier_rejected": "Supplier rejected",
+    "auth_failed": "Authentication failed",
+    "rate_limited": "Rate limited",
+    "supplier_unavailable": "Supplier unavailable"
+  },
   "roles": {
     "admin": "Administrator",
     "operations": "Operations",

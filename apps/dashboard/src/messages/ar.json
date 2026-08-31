@@ -52,6 +52,126 @@
   "appSection": {
     "placeholder": "هذا التطبيق مثبت، وستصل واجهته في مرحلته من خطة البناء."
   },
+  "workspace": {
+    "bookings": {
+      "title": "الحجوزات",
+      "subtitle": "جميع الحجوزات من كل القنوات",
+      "columns": {
+        "reference": "المرجع",
+        "state": "الحالة",
+        "channel": "القناة",
+        "supplier": "المورد",
+        "sell": "سعر البيع",
+        "created": "تاريخ الإنشاء"
+      },
+      "filters": {
+        "state": "الحالة",
+        "supplier": "المورد",
+        "from": "من",
+        "to": "إلى",
+        "any": "الكل",
+        "apply": "تطبيق"
+      },
+      "empty": {
+        "title": "لا توجد حجوزات بعد",
+        "description": "تظهر هنا الحجوزات من جميع القنوات فور إنشائها"
+      }
+    },
+    "detail": {
+      "channel": "القناة",
+      "paymentState": "الدفع",
+      "net": "الصافي",
+      "sell": "سعر البيع",
+      "cancellationPolicy": "سياسة الإلغاء",
+      "history": "سجل الحالات",
+      "historySubtitle": "من سجل التدقيق غير القابل للتعديل",
+      "historyEmpty": "لا توجد أحداث مسجلة",
+      "ledger": "قيود دفتر الأستاذ",
+      "ledgerSubtitle": "قيود مزدوجة لهذا الحجز — تُقرأ من الدفتر ولا يعاد حسابها",
+      "ledgerEmpty": "لا توجد قيود بعد",
+      "ledgerColumns": { "account": "الحساب", "memo": "البيان", "amount": "المبلغ", "postedAt": "تاريخ القيد" },
+      "documents": "المستندات",
+      "documentsEmpty": "لا توجد مستندات بعد",
+      "documentsNote": "تظهر القسائم والفواتير هنا عند إطلاق توليد المستندات"
+    },
+    "queue": {
+      "title": "التدخل اليدوي",
+      "subtitle": "عناصر لم تستطع الأتمتة حسمها بأمان",
+      "age": "منذ",
+      "retryPoll": "إعادة الاستعلام من المورد",
+      "markResolved": "اعتبارها محلولة",
+      "openBooking": "فتح الحجز",
+      "resolveTitle": "اعتبار هذا التصعيد محلولًا",
+      "resolveNote": "ما الذي تم عمله",
+      "cancel": "إلغاء",
+      "resolved": "تم حل التصعيد",
+      "outcomes": {
+        "transitioned_confirmed": "أكد المورد الحجز — تم حسم العنصر",
+        "transitioned_cancelled": "أفاد المورد بالإلغاء — تم حسم العنصر",
+        "transitioned_failed": "أفاد المورد بالفشل — تم حسم العنصر",
+        "still_pending": "لا يزال معلقًا لدى المورد — لا تغيير",
+        "retrieve_failed": "تعذر الوصول إلى المورد",
+        "escalated": "لا يزال مصعّدًا",
+        "conflict_skipped": "عملية أخرى حسمت العنصر أولًا",
+        "error": "فشلت إعادة المحاولة بشكل غير متوقع"
+      },
+      "empty": {
+        "title": "لا يوجد ما يتطلب التدخل",
+        "description": "تظهر هنا الحجوزات المصعّدة مع القرار المطلوب بالضبط"
+      },
+      "errors": { "actionFailed": "تعذر إتمام الإجراء" }
+    },
+    "search": {
+      "title": "وحدة البحث",
+      "subtitle": "بحث الموظفين لخدمة الاتصالات الهاتفية والزيارات المباشرة",
+      "propertyIds": "معرّفات الفنادق",
+      "propertyIdsHint": "معرّفات قياسية مفصولة بفواصل (مثل tbo:1010062) — البحث بالوجهة يصل مع خدمة المطابقة",
+      "checkIn": "تاريخ الوصول",
+      "checkOut": "تاريخ المغادرة",
+      "adults": "البالغون",
+      "nationality": "الجنسية",
+      "nationalityHint": "رمز ISO — تختلف الأسعار بحسبها",
+      "currency": "العملة",
+      "search": "بحث",
+      "streaming": "جارٍ البحث لدى الموردين…",
+      "budgetExhausted": "نتائج جزئية — بعض الموردين لم يجب ضمن المهلة",
+      "streamFailed": "فشل بث البحث — حاول مرة أخرى",
+      "refundable": "قابل للاسترداد",
+      "nonRefundable": "غير قابل للاسترداد",
+      "openInPortal": "فتح في البوابة",
+      "openInPortalHint": "يكتمل الحجز بالنيابة في بوابة الوكلاء في هذه المرحلة",
+      "empty": { "title": "لا توجد إتاحة", "description": "لم يرجع أي مورد أسعارًا لهذا البحث" },
+      "errors": { "form": "أدخل معرّفات الفنادق والتواريخ وجنسية من حرفين" }
+    }
+  },
+  "bookingStates": {
+    "quoted": "مسعّر",
+    "reserved": "محجوز مبدئيًا",
+    "pending_confirmation": "بانتظار التأكيد",
+    "confirmed": "مؤكد",
+    "issued": "صادر",
+    "amendment_pending": "تعديل معلق",
+    "completed": "مكتمل",
+    "cancelled": "ملغى",
+    "failed": "فاشل"
+  },
+  "policy": {
+    "free": "إلغاء مجاني",
+    "nonRefundable": "غير قابل للاسترداد",
+    "until": "حتى",
+    "from": "من",
+    "now": "الآن"
+  },
+  "supplierErrors": {
+    "sold_out": "نفدت الإتاحة",
+    "price_changed": "تغيّر السعر",
+    "invalid_request": "طلب غير صالح",
+    "supplier_timeout": "انتهت مهلة المورد",
+    "supplier_rejected": "رفض المورد الطلب",
+    "auth_failed": "فشل التحقق من بيانات الاعتماد",
+    "rate_limited": "تجاوز حد الطلبات",
+    "supplier_unavailable": "المورد غير متاح"
+  },
   "roles": {
     "admin": "مدير",
     "operations": "العمليات",

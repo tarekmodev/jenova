@@ -8,7 +8,7 @@ submitted.
 - [x] `ui` package v1: Modernize (MUI) wrapped with Jenova theming; RTL/LTR switch;
       core primitives (layout, tables, forms, toasts, empty/error states) — the only UI
       import for dashboard-class apps.
-- [ ] **Dashboard shell** (`apps/dashboard`): login (tenant-staff realm), app-framework
+- [x] **Dashboard shell** (`apps/dashboard`): login (tenant-staff realm), app-framework
       navigation driven by entitlements, Settings v1 (users & roles, supplier accounts
       with test-connection, branding basics), core workspace v1 (bookings list/detail
       from AuditEvents, search console v1).

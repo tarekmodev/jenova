@@ -19,7 +19,7 @@
  * future sagas) goes through `transition`.
  */
 
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import type { BookingItemState, CancellationPolicy, Money, SalesChannel, SubTenantId, TenantId, Vertical } from "@jenova/domain";
 import { assertTransition, assertValidMoney } from "@jenova/domain";
 import {
@@ -482,6 +482,70 @@ export class BookingTransitionRunner {
           bookingId: row.bookingId,
           bookingItemId,
           payload: { reason, escalatedAt: now.toISOString() },
+        },
+      ]);
+    });
+    if (events === null) {
+      return false;
+    }
+    await this.dispatcher.dispatch(tenant, events);
+    return true;
+  }
+
+  /**
+   * Resolves an escalation: a human dealt with the item (or a manual retry
+   * settled it), so the flag clears and — for items still in a polled wait —
+   * automation may pick it up again (nextPollAt reset to now). Idempotent
+   * the same way escalate is: resolving a non-escalated item is a no-op
+   * returning false. Audited + evented like every state change (rule 7);
+   * ledger untouched — no money moves by clearing a flag.
+   */
+  async resolveEscalation(
+    tenant: TenantId,
+    bookingItemId: string,
+    actor: AuditActor,
+    note: string,
+  ): Promise<boolean> {
+    const db = await this.resolver.getTenantDb(tenant);
+    const now = new Date();
+    const events = await db.transaction(async (tx) => {
+      const current = await tx
+        .select({
+          bookingId: bookingItems.bookingId,
+          escalatedAt: bookingItems.escalatedAt,
+          escalationReason: bookingItems.escalationReason,
+        })
+        .from(bookingItems)
+        .where(and(eq(bookingItems.id, bookingItemId), isNotNull(bookingItems.escalatedAt)))
+        .limit(1);
+      const row = current[0];
+      if (row === undefined || row.escalatedAt === null) {
+        return null;
+      }
+      await tx
+        .update(bookingItems)
+        .set({
+          escalatedAt: null,
+          escalationReason: null,
+          nextPollAt: now,
+          updatedAt: now,
+        })
+        .where(and(eq(bookingItems.id, bookingItemId), isNotNull(bookingItems.escalatedAt)));
+      await tx.insert(auditEvents).values({
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        entityType: "booking_item",
+        entityId: bookingItemId,
+        action: "booking_item.escalation_resolved",
+        before: { escalatedAt: row.escalatedAt.toISOString(), reason: row.escalationReason },
+        after: { escalatedAt: null, note },
+      });
+      return insertOutboxEvents(tx, [
+        {
+          eventType: "booking_item.escalation_resolved",
+          bookingId: row.bookingId,
+          bookingItemId,
+          payload: { note, resolvedAt: now.toISOString() },
         },
       ]);
     });
