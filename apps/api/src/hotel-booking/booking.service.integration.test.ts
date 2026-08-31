@@ -367,11 +367,17 @@ describe.skipIf(!available)("HotelBookingService — book/cancel over recorded T
     const db = await resolver.getTenantDb(tenant);
     const [item] = await db.select().from(bookingItems).where(eq(bookingItems.id, bookingItemId));
     if (item === undefined) throw new Error("booked item missing");
+    // Review H1: the booked item carries the SELL-side snapshot, and the
+    // agency-facing preview resolves against IT (sell === net in this
+    // recorded flow, so the amounts coincide — the source must not).
+    expect(item.sellPolicySnapshot).not.toBeNull();
     const preview = await service.previewCancellation(tenant, bookingId, {
       subTenantId: null,
       actor: ACTOR,
     });
-    const expected = resolvePenaltyAt(item.policySnapshot, preview.asOf) ?? zero(item.currency);
+    const expected =
+      resolvePenaltyAt(item.sellPolicySnapshot ?? item.policySnapshot, preview.asOf) ??
+      zero(item.currency);
     expect(preview.penalty).toEqual(expected);
     expect(preview.refundable).toBe(true);
   });

@@ -79,6 +79,9 @@ export const agencies = pgTable("agency", {
   creditCurrency: char("credit_currency", { length: 3 }),
   paymentTermsDays: integer("payment_terms_days"),
   allowedCurrencies: jsonb("allowed_currencies").$type<string[]>().notNull().default([]),
+  // 0005: default guest nationality for this agency's searches (rule 9) —
+  // a per-agency DEFAULT the agent can always override per search.
+  defaultNationality: char("default_nationality", { length: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
@@ -94,6 +97,8 @@ export const agencyUsers = pgTable("agency_user", {
   displayName: text("display_name").notNull(),
   role: text("role").notNull(),
   status: text("status").notNull().default("active"),
+  // 0005: argon2id PHC string (login flows). NULL can never log in.
+  passwordHash: text("password_hash"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
@@ -178,6 +183,9 @@ export const offers = pgTable("offer", {
   priceHash: text("price_hash").notNull(),
   markupRuleId: uuid("markup_rule_id").references(() => markupRules.id),
   policySnapshot: jsonb("policy_snapshot").$type<CancellationPolicy>(),
+  // 0007: SELL-side policy for agency display (net penalties are
+  // confidential); policy_snapshot stays the internal net truth.
+  sellPolicySnapshot: jsonb("sell_policy_snapshot").$type<CancellationPolicy>(),
   expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   supplierOfferToken: text("supplier_offer_token"),
@@ -237,6 +245,9 @@ export const bookingItems = pgTable(
     sellAmount: bigint("sell_amount", { mode: "bigint" }).notNull(),
     currency: char("currency", { length: 3 }).notNull(),
     policySnapshot: jsonb("policy_snapshot").$type<CancellationPolicy>().notNull(),
+    // 0007: SELL-side policy for agency display; policy_snapshot stays the
+    // internal net truth (supplier settlement + ledger penalty postings).
+    sellPolicySnapshot: jsonb("sell_policy_snapshot").$type<CancellationPolicy>(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     // 0004 booking-engine columns (expand-only; see the migration for the

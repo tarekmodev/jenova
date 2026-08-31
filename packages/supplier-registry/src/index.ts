@@ -18,11 +18,16 @@
 
 import {
   createSkippedRoomRateLog,
+  createTboContentAdapter,
   createTboHotelAdapter,
   createTboTransport,
   TBO_SUPPLIER_CODE,
 } from "@jenova/adapter-hotel-tbo";
-import type { SupplierAccountCredentials, HotelSupplierAdapter } from "@jenova/supplier-sdk";
+import type {
+  HotelContentAdapter,
+  HotelSupplierAdapter,
+  SupplierAccountCredentials,
+} from "@jenova/supplier-sdk";
 import type { TenantId } from "@jenova/domain";
 
 /** Nest injection token for the process-wide {@link SupplierRegistry}. */
@@ -72,6 +77,12 @@ export interface SupplierRegistry {
    * supplier unavailability, never as a crash. */
   hotelAdapter(supplierCode: string): HotelSupplierAdapter | null;
   /**
+   * Static-content capability (country/city/property lists — M2 #96).
+   * null = this supplier exposes no content surface; content endpoints skip
+   * it and fall through to the next enabled supplier.
+   */
+  hotelContent(supplierCode: string): HotelContentAdapter | null;
+  /**
    * Supplier vocabulary drift: occurrences of unrecognized supplier
    * vocabulary (e.g. a new TBO MealType spelling) keyed `<field>:<rawValue>`
    * (review M1 on #72 — the counter the Platform Admin supplier health
@@ -84,13 +95,16 @@ const NO_DRIFT: ReadonlyMap<string, number> = new Map();
 
 export class StaticSupplierRegistry implements SupplierRegistry {
   private readonly hotels: ReadonlyMap<string, HotelSupplierAdapter>;
+  private readonly content: ReadonlyMap<string, HotelContentAdapter>;
   private readonly drift: ReadonlyMap<string, ReadonlyMap<string, number>>;
 
   constructor(
     hotelAdapters: readonly HotelSupplierAdapter[],
     drift: ReadonlyMap<string, ReadonlyMap<string, number>> = new Map(),
+    contentAdapters: readonly HotelContentAdapter[] = [],
   ) {
     this.hotels = new Map(hotelAdapters.map((adapter) => [adapter.supplierCode, adapter]));
+    this.content = new Map(contentAdapters.map((adapter) => [adapter.supplierCode, adapter]));
     this.drift = drift;
   }
 
@@ -100,6 +114,10 @@ export class StaticSupplierRegistry implements SupplierRegistry {
 
   hotelAdapter(supplierCode: string): HotelSupplierAdapter | null {
     return this.hotels.get(supplierCode) ?? null;
+  }
+
+  hotelContent(supplierCode: string): HotelContentAdapter | null {
+    return this.content.get(supplierCode) ?? null;
   }
 
   hotelVocabularyDrift(supplierCode: string): ReadonlyMap<string, number> | null {
@@ -123,14 +141,18 @@ export interface SupplierRegistryOptions {
 export function createSupplierRegistry(options: SupplierRegistryOptions = {}): SupplierRegistry {
   const mode = options.mode ?? transportModeForEnv(resolveNodeEnv());
   const tboDrift = createSkippedRoomRateLog();
+  // Lifecycle and content share ONE transport per supplier: one circuit
+  // breaker per supplier account, exactly as before content existed.
+  const tboTransport = createTboTransport({ mode });
   return new StaticSupplierRegistry(
     [
       createTboHotelAdapter({
-        transport: createTboTransport({ mode }),
+        transport: tboTransport,
         onSkippedRoomRate: tboDrift.observer,
       }),
     ],
     new Map([[TBO_SUPPLIER_CODE, tboDrift.counts()]]),
+    [createTboContentAdapter({ transport: tboTransport })],
   );
 }
 
@@ -207,6 +229,43 @@ export class EnvSupplierCredentialsSource implements SupplierCredentialsSource {
         apiUrl: require("TBO_HOTEL_API_URL"),
         username: require("TBO_HOTEL_USERNAME"),
         password: require("TBO_HOTEL_PASSWORD"),
+      },
+    });
+  }
+}
+
+/**
+ * TEST-ONLY credentials seam for replay transports: sandbox-replay resolves
+ * recordings by URL + body fingerprint, never by credentials, so structural
+ * placeholders are all a replay run needs (the SAME placeholders the
+ * integration suites use). The apiUrl must match the recorded base URL — it
+ * is part of the fingerprint. Refuses to run outside NODE_ENV=test.
+ */
+export class ReplaySupplierCredentialsSource implements SupplierCredentialsSource {
+  constructor(private readonly env: Readonly<Record<string, string | undefined>> = process.env) {}
+
+  credentialsFor(tenant: TenantId, supplierCode: string): Promise<SupplierAccountCredentials> {
+    if (this.env["NODE_ENV"] !== "test") {
+      return Promise.reject(
+        new Error(
+          "ReplaySupplierCredentialsSource is a test-only seam — it requires an explicit NODE_ENV=test",
+        ),
+      );
+    }
+    if (supplierCode !== TBO_SUPPLIER_CODE) {
+      return Promise.reject(
+        new Error(`no replay credentials mapping for supplier ${supplierCode}`),
+      );
+    }
+    return Promise.resolve({
+      tenantId: tenant,
+      supplierCode,
+      environment: "sandbox",
+      secrets: {
+        // Recorded base URL (fingerprint component) + structural placeholders.
+        apiUrl: "https://api.tbotechnology.in/TBOHolidays_HotelAPI",
+        username: "replay",
+        password: "replay",
       },
     });
   }

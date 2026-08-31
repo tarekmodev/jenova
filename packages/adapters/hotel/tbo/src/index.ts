@@ -1,4 +1,5 @@
 export { createTboHotelAdapter, type TboHotelAdapterOptions } from "./adapter";
+export { createTboContentAdapter } from "./content";
 export { createSkippedRoomRateLog, type SkippedRoomRateLog } from "./diagnostics";
 export type { SkippedRoomRateEvent, SkippedRoomRateObserver } from "./mapping";
 export { TBO_SECRET_KEYS, tboAccount, basicAuthorization, type TboAccount } from "./auth";

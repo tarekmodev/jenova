@@ -60,6 +60,21 @@ export const platformUsers = pgTable("platform_user", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
+/**
+ * Host → tenant binding (0002) — what the gateway's tenant-resolution stage
+ * reads. `host` is normalized (lowercase, no port) before insert AND lookup;
+ * the UNIQUE constraint is the isolation guarantee (one host, one tenant).
+ */
+export const tenantDomains = pgTable("tenant_domain", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" })
+    .$type<TenantId>(),
+  host: text("host").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
 /** Platform-level supplier definition + certification status per environment. */
 export const supplierCatalogEntries = pgTable("supplier_catalog_entry", {
   id: uuid("id").primaryKey().defaultRandom(),

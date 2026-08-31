@@ -14,7 +14,7 @@ submitted.
       from AuditEvents, search console v1).
 - [ ] **B2B app v1 (staff side)**: agency CRUD, portal-user management, markup-profile
       assignment (rules editor arrives M3).
-- [ ] **Agent Portal alpha** (`apps/portal-agent`): agency login, streaming hotel search
+- [x] **Agent Portal alpha** (`apps/portal-agent`): agency login, streaming hotel search
       (SSE), offer detail with normalized cancellation policy, check→book flow, booking
       list/detail, cancellation with fee preview.
 - [x] **Documents v1** (`api/documents`): bilingual voucher PDF (Typst), branded per

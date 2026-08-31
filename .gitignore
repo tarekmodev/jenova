@@ -3,6 +3,9 @@ dist/
 .next/
 .turbo/
 coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
 .env*
 !.env.example
 packages/sandbox-replay/raw-captures/

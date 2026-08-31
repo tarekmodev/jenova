@@ -325,6 +325,14 @@ describe("pricing + signed-offer issuance (rules 6/8)", () => {
     expect(summary.offerToken.startsWith("of1.")).toBe(true);
     expect(summary.refundable).toBe(true);
 
+    // Review H1: the agency-facing policy is SELL-side — the 10_000 net
+    // penalty scales by sell/net to 11_000; the net figure never appears
+    // anywhere in the summary payload.
+    expect(summary.cancellationPolicy.rules).toEqual([
+      { fromUtc: "2026-10-01T00:00:00.000Z", penalty: money(11_000, "SAR") },
+    ]);
+    expect(JSON.stringify(summary)).not.toContain("10000");
+
     // The token verifies end to end and pins nationality + pricing scope.
     const verified = await h.offersService.verifyOfferToken(TENANT, summary.offerToken, {
       subTenantId: null,

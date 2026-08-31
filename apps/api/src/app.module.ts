@@ -9,10 +9,12 @@
  */
 
 import { Module } from "@nestjs/common";
+import { AgencyAuthModule } from "./auth/agency-auth.module";
 import { ConfigModule } from "./config/config.module";
 import { DocumentsModule } from "./documents/documents.module";
 import { GatewayModule } from "./gateway/gateway.module";
 import { HotelBookingModule } from "./hotel-booking/hotel-booking.module";
+import { HotelContentModule } from "./hotel-content/hotel-content.module";
 import { HotelSearchModule } from "./hotel-search/hotel-search.module";
 import { OffersModule } from "./offers/offers.module";
 import { PricingModule } from "./pricing/pricing.module";
@@ -29,9 +31,11 @@ import { HTTP_SERVER_HOOKS, noopHttpServerHooks } from "./observability/instrume
   imports: [
     ConfigModule,
     GatewayModule,
+    AgencyAuthModule,
     PricingModule,
     OffersModule,
     HotelSearchModule,
+    HotelContentModule,
     HotelBookingModule,
     DocumentsModule,
   ],

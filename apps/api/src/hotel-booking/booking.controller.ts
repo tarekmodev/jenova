@@ -32,6 +32,7 @@ import {
 import { toBookingHttpError } from "./errors";
 import {
   HOTEL_BOOKING_SERVICE,
+  type BookingListEntry,
   type CancelBookingResult,
   type CancellationPreview,
   type HotelBookingService,
@@ -73,6 +74,20 @@ function previewPayload(preview: CancellationPreview) {
     refund: preview.refund === null ? null : moneyPayload(preview.refund),
     refundable: preview.refundable,
     asOf: preview.asOf.toISOString(),
+  };
+}
+
+function listPayload(row: BookingListEntry) {
+  return {
+    bookingId: row.bookingId,
+    clientReference: row.clientReference,
+    createdAt: row.createdAt.toISOString(),
+    state: row.state,
+    supplierCode: row.supplierCode,
+    supplierReference: row.supplierReference,
+    sell: moneyPayload(row.sell),
+    escalated: row.escalated,
+    cancellationRequestedAt: row.cancellationRequestedAt?.toISOString() ?? null,
   };
 }
 
@@ -149,6 +164,26 @@ export class HotelBookingController {
     }
   }
 
+  @Get()
+  @RequiresRealm("agency")
+  @ApiOperation({
+    summary: "List the calling agency's bookings (newest first)",
+    description:
+      "Operational list for the Agent Portal (issue #98): persisted booking + item state and " +
+      "sell amounts only. Financial reports remain ledger reads.",
+  })
+  async list(@Req() request: RequestContextCarrier) {
+    const { tenant, auth } = this.scope(request);
+    try {
+      const rows = await this.service.listBookings(tenant.tenantId, {
+        subTenantId: auth.principal.subTenantId,
+      });
+      return { bookings: rows.map((row) => listPayload(row)) };
+    } catch (error) {
+      throw toBookingHttpError(error);
+    }
+  }
+
   @Get(":bookingId")
   @RequiresRealm("agency")
   @ApiOperation({ summary: "Read one booking (scoped to the calling agency)" })
@@ -156,14 +191,15 @@ export class HotelBookingController {
     const { tenant, auth } = this.scope(request);
     const id = this.parseId(bookingId);
     try {
-      const { booking, item } = await this.service.getBooking(tenant.tenantId, id, {
-        subTenantId: auth.principal.subTenantId,
-      });
+      const scope = { subTenantId: auth.principal.subTenantId };
+      const { booking, item } = await this.service.getBooking(tenant.tenantId, id, scope);
+      const history = await this.service.getBookingHistory(tenant.tenantId, id, scope);
       return {
         bookingId: booking.id,
         clientReference: booking.clientReference,
         channel: booking.channel,
         paymentState: booking.paymentState,
+        createdAt: booking.createdAt.toISOString(),
         item: {
           bookingItemId: item.id,
           state: item.state,
@@ -172,7 +208,17 @@ export class HotelBookingController {
           sell: { amount: moneyAmountFrom(item.sellAmount, "sell_amount"), currency: item.currency },
           cancellationRequestedAt: item.cancellationRequestedAt?.toISOString() ?? null,
           escalated: item.escalatedAt !== null,
+          // SELL-side snapshot — the only policy the agency realm may see
+          // (review H1: net penalties disclose the tenant's buy rate); the
+          // fee preview resolves against this same view.
+          policy: this.service.agencyPolicyOf(item),
         },
+        history: history.map((entry) => ({
+          action: entry.action,
+          fromState: entry.fromState,
+          toState: entry.toState,
+          occurredAt: entry.occurredAt.toISOString(),
+        })),
       };
     } catch (error) {
       throw toBookingHttpError(error);

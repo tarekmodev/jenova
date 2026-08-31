@@ -27,7 +27,14 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { Locale, Money, SalesChannel, SubTenantId, TenantId } from "@jenova/domain";
+import type {
+  CancellationPolicy,
+  Locale,
+  Money,
+  SalesChannel,
+  SubTenantId,
+  TenantId,
+} from "@jenova/domain";
 import { isSupplierError, type SupplierErrorKind } from "@jenova/domain";
 import type {
   AdapterCallContext,
@@ -77,6 +84,13 @@ export interface HotelOfferSummary {
   /** Server-resolved sell price — never a client-trusted number. */
   readonly sell: Money;
   readonly refundable: boolean;
+  /**
+   * The SELL-side policy snapshot the offer was issued with (deadlines in
+   * UTC, penalties as sell-scaled Money — review H1: net penalties disclose
+   * the tenant's buy rate) — display data for the offer card/detail; the
+   * BOOKED terms are always the snapshots on the signed offer row (#96).
+   */
+  readonly cancellationPolicy: CancellationPolicy;
 }
 
 /**
@@ -170,6 +184,18 @@ function assertValidRequest(request: HotelSearchRequest): void {
       }
     }
   }
+}
+
+/**
+ * Hotel offers always carry a policy, and pricing derives the sell-side
+ * twin from it — a null here is an assembly bug, never a client state
+ * (review H1: the agency surface must NEVER fall back to the net policy).
+ */
+function requireSellPolicy(policy: CancellationPolicy | null): CancellationPolicy {
+  if (policy === null) {
+    throw new Error("priced hotel offer is missing its sell-side policy snapshot");
+  }
+  return policy;
 }
 
 function nightsBetween(checkIn: string, checkOut: string): number {
@@ -418,6 +444,7 @@ export class HotelSearchService {
         boardBasis: offer.boardBasis,
         sell: priced.sell,
         refundable: offer.cancellationPolicy.refundable,
+        cancellationPolicy: requireSellPolicy(priced.sellPolicySnapshot),
       });
     }
     return summaries;
