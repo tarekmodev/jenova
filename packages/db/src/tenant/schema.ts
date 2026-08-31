@@ -46,7 +46,13 @@ export type PaymentState = (typeof PAYMENT_STATES)[number];
 export const LEDGER_ACCOUNT_TYPES = ["asset", "liability", "equity", "revenue", "expense"] as const;
 export type LedgerAccountType = (typeof LEDGER_ACCOUNT_TYPES)[number];
 
-export const AUDIT_ACTOR_TYPES = ["platform_user", "agency_user", "system", "api_client"] as const;
+export const AUDIT_ACTOR_TYPES = [
+  "platform_user",
+  "agency_user",
+  "staff_user",
+  "system",
+  "api_client",
+] as const;
 export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number];
 
 /**
@@ -69,6 +75,43 @@ export const supplierAccounts = pgTable(
   },
   (t) => [uniqueIndex("supplier_account_code_env_key").on(t.supplierCode, t.environment)],
 );
+
+export const STAFF_USER_STATUSES = ["active", "disabled"] as const;
+export type StaffUserStatus = (typeof STAFF_USER_STATUSES)[number];
+
+/**
+ * Tenant staff (Internal Dashboard, `tenant_staff` realm — docs/08).
+ * Password is an argon2id PHC string; the TOTP secret is stored ONLY as an
+ * encrypted blob + key id (same discipline as supplier_account secrets).
+ * A pending secret exists between enroll and activate so an abandoned
+ * enrollment never locks the account.
+ */
+export const staffUsers = pgTable("staff_user", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  role: text("role").notNull(),
+  status: text("status").$type<StaffUserStatus>().notNull().default("active"),
+  passwordHash: text("password_hash").notNull(),
+  totpSecretEncrypted: bytea("totp_secret_encrypted"),
+  totpSecretKeyId: text("totp_secret_key_id"),
+  totpPendingSecretEncrypted: bytea("totp_pending_secret_encrypted"),
+  totpPendingSecretKeyId: text("totp_pending_secret_key_id"),
+  totpEnrolledAt: timestamp("totp_enrolled_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
+/**
+ * Tenant-wide staff security policy — a single row (id = 1, enforced in
+ * SQL). `enforceTotp` makes TOTP enrollment mandatory at next login for
+ * every staff user (docs/08: "TOTP 2FA enforceable by tenant policy").
+ */
+export const staffPolicy = pgTable("staff_policy", {
+  id: integer("id").primaryKey().default(1),
+  enforceTotp: boolean("enforce_totp").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
 
 /** B2B trade buyer (a sub-tenant): credit terms in minor units + currency. */
 export const agencies = pgTable("agency", {

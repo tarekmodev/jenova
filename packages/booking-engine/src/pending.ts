@@ -181,8 +181,20 @@ export class PendingConfirmationPoller {
     return { due: due.length, outcomes };
   }
 
-  /** Polls ONE item: retrieve at the supplier, act through the runner. */
-  async pollItem(tenant: TenantId, item: BookingItemRow): Promise<PendingItemOutcome> {
+  /**
+   * Polls ONE item: retrieve at the supplier, act through the runner.
+   *
+   * `options.force` is the manual-intervention retry (core-workspace
+   * queue): the poll runs regardless of backoff schedule and NEVER
+   * (re-)escalates on a still-pending answer — a human asked for exactly
+   * one attempt and reads the outcome directly.
+   */
+  async pollItem(
+    tenant: TenantId,
+    item: BookingItemRow,
+    options: { readonly force?: boolean } = {},
+  ): Promise<PendingItemOutcome> {
+    const force = options.force === true;
     const kind = waitKindOf(item);
     if (kind === "reservation") {
       // Stranded pre-book item — never guess with money on the line; hand
@@ -219,7 +231,9 @@ export class PendingConfirmationPoller {
       });
     } catch (error) {
       const detail = error instanceof SupplierError ? error.kind : "unexpected retrieve failure";
-      const escalated = await this.deferOrEscalate(tenant, item, kind, `retrieve failed: ${detail}`);
+      const escalated = force
+        ? false
+        : await this.deferOrEscalate(tenant, item, kind, `retrieve failed: ${detail}`);
       return {
         bookingItemId: item.id,
         kind,
@@ -229,15 +243,16 @@ export class PendingConfirmationPoller {
     }
 
     if (kind === "confirmation") {
-      return this.settleConfirmationWait(tenant, item, record);
+      return this.settleConfirmationWait(tenant, item, record, force);
     }
-    return this.settleCancellationWait(tenant, item, record);
+    return this.settleCancellationWait(tenant, item, record, force);
   }
 
   private async settleConfirmationWait(
     tenant: TenantId,
     item: BookingItemRow,
     record: HotelBookingRecord,
+    force: boolean,
   ): Promise<PendingItemOutcome> {
     const kind: PendingWaitKind = "confirmation";
     switch (record.status) {
@@ -276,7 +291,9 @@ export class PendingConfirmationPoller {
         return { bookingItemId: item.id, kind, outcome: "transitioned_cancelled" };
       }
       case "pending": {
-        const escalated = await this.deferOrEscalate(tenant, item, kind, "still pending at the supplier");
+        const escalated = force
+          ? false
+          : await this.deferOrEscalate(tenant, item, kind, "still pending at the supplier");
         return { bookingItemId: item.id, kind, outcome: escalated ? "escalated" : "still_pending" };
       }
     }
@@ -286,6 +303,7 @@ export class PendingConfirmationPoller {
     tenant: TenantId,
     item: BookingItemRow,
     record: HotelBookingRecord,
+    force: boolean,
   ): Promise<PendingItemOutcome> {
     const kind: PendingWaitKind = "cancellation";
     if (record.status === "cancelled") {
@@ -301,7 +319,9 @@ export class PendingConfirmationPoller {
       return { bookingItemId: item.id, kind, outcome: "transitioned_cancelled" };
     }
     // pending (CancellationInProgress) or still confirmed: keep waiting.
-    const escalated = await this.deferOrEscalate(
+    const escalated = force
+      ? false
+      : await this.deferOrEscalate(
       tenant,
       item,
       kind,

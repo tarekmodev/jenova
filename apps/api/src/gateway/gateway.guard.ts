@@ -55,7 +55,12 @@ export class GatewayGuard implements CanActivate {
     }
 
     await this.pipeline.run(context, {
-      host: headerValue(req, "host"),
+      // X-Forwarded-Host first: the dashboard/portal BFFs are proxies, and
+      // Node's fetch (undici) refuses to override Host itself. Security
+      // posture is unchanged — the presented host was ALWAYS unauthenticated
+      // client input; sessions are tenant-bound, so a spoofed host only
+      // yields the same 401/404 a spoofed Host header would.
+      host: headerValue(req, "x-forwarded-host") ?? headerValue(req, "host"),
       authorization: headerValue(req, "authorization"),
       requiredApp:
         this.reflector.getAllAndOverride<AppKey>(REQUIRES_APP_METADATA, targets) ?? null,

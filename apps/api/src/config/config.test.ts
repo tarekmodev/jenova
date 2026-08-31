@@ -23,10 +23,21 @@ describe("loadApiConfig", () => {
       tenantRuntimeDsn: validEnv.JENOVA_TENANT_RUNTIME_DSN,
       offerSigningKey: validEnv.OFFER_SIGNING_KEY,
       hotelSearchBudgetMs: 8_000,
+      // Unset data key ⇒ sealed-secret features refuse on use (secret-box).
+      dataKey: null,
+      dataKeyId: "env-v1",
       // No S3 block → documents deliberately disabled.
       documents: null,
     });
     expect(Object.isFrozen(config)).toBe(true);
+  });
+
+  it("accepts a 32-byte base64 data key and rejects any other length", () => {
+    const key = Buffer.alloc(32, 1).toString("base64");
+    expect(loadApiConfig({ ...validEnv, JENOVA_DATA_KEY: key }).dataKey).toBe(key);
+    expect(() =>
+      loadApiConfig({ ...validEnv, JENOVA_DATA_KEY: Buffer.alloc(16, 1).toString("base64") }),
+    ).toThrowError(ApiConfigError);
   });
 
   it("honors explicit NODE_ENV and API_PORT", () => {

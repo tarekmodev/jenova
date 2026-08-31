@@ -1,0 +1,277 @@
+{
+  "login": {
+    "title": "Jenova",
+    "subtitle": "Internal Dashboard",
+    "email": "Email",
+    "password": "Password",
+    "totpCode": "Verification code",
+    "totpHint": "Enter the code from your authenticator app",
+    "signIn": "Sign in",
+    "verify": "Verify",
+    "errors": {
+      "unauthorized": "Incorrect email or password",
+      "totp_required": "A verification code is required",
+      "totp_invalid": "The verification code is not valid",
+      "internal_error": "Sign-in failed — please try again"
+    }
+  },
+  "nav": {
+    "sections": {
+      "workspace": "Workspace",
+      "apps": "Apps",
+      "settings": "Settings"
+    },
+    "bookings": "Bookings",
+    "queue": "Intervention queue",
+    "searchConsole": "Search console",
+    "users": "Users & roles",
+    "suppliers": "Supplier accounts",
+    "branding": "Branding",
+    "account": "My account",
+    "app": {
+      "b2b": "B2B",
+      "corporate": "Corporate",
+      "finance": "Finance",
+      "api_access": "API access",
+      "storefront": "Storefront",
+      "crm": "CRM",
+      "desk": "Desk",
+      "contracting": "Contracting"
+    }
+  },
+  "shell": {
+    "collapseNav": "Collapse navigation",
+    "openNav": "Open navigation",
+    "accountSettings": "Account settings",
+    "logout": "Sign out"
+  },
+  "forbidden": {
+    "title": "App not installed",
+    "description": "This app is not enabled for your company. Contact your administrator."
+  },
+  "appSection": {
+    "placeholder": "This app is installed. Its dashboard section arrives with its milestone."
+  },
+  "workspace": {
+    "bookings": {
+      "title": "Bookings",
+      "subtitle": "Every booking across every surface",
+      "columns": {
+        "reference": "Reference",
+        "state": "State",
+        "channel": "Channel",
+        "supplier": "Supplier",
+        "sell": "Sell",
+        "created": "Created"
+      },
+      "filters": {
+        "state": "State",
+        "supplier": "Supplier",
+        "from": "From",
+        "to": "To",
+        "any": "Any",
+        "apply": "Apply"
+      },
+      "empty": {
+        "title": "No bookings yet",
+        "description": "Bookings from every surface appear here as they are made"
+      }
+    },
+    "detail": {
+      "channel": "Channel",
+      "paymentState": "Payment",
+      "net": "Net",
+      "sell": "Sell",
+      "cancellationPolicy": "Cancellation policy",
+      "history": "State history",
+      "historySubtitle": "From the append-only audit trail",
+      "historyEmpty": "No events recorded",
+      "ledger": "Ledger postings",
+      "ledgerSubtitle": "Double-entry postings of this booking — read from the ledger, never recomputed",
+      "ledgerEmpty": "No postings yet",
+      "ledgerColumns": { "account": "Account", "memo": "Memo", "amount": "Amount", "postedAt": "Posted" },
+      "documents": "Documents",
+      "documentsEmpty": "No documents yet",
+      "documentsNote": "Vouchers and invoices appear here when document generation ships"
+    },
+    "queue": {
+      "title": "Manual intervention",
+      "subtitle": "Items automation could not safely resolve",
+      "age": "Age",
+      "retryPoll": "Retry supplier poll",
+      "markResolved": "Mark resolved",
+      "openBooking": "Open booking",
+      "resolveTitle": "Mark this escalation resolved",
+      "resolveNote": "What was done",
+      "cancel": "Cancel",
+      "resolved": "Escalation resolved",
+      "outcomes": {
+        "transitioned_confirmed": "The supplier confirmed the booking — item settled",
+        "transitioned_cancelled": "The supplier reports it cancelled — item settled",
+        "transitioned_failed": "The supplier reports it failed — item settled",
+        "still_pending": "Still pending at the supplier — no change",
+        "retrieve_failed": "The supplier could not be reached",
+        "escalated": "Still escalated",
+        "conflict_skipped": "Another process settled the item first",
+        "error": "The retry failed unexpectedly"
+      },
+      "empty": {
+        "title": "Nothing needs intervention",
+        "description": "Escalated bookings appear here with the exact decision needed"
+      },
+      "errors": { "actionFailed": "The action could not be completed" }
+    },
+    "search": {
+      "title": "Search console",
+      "subtitle": "Staff-side hotel search for phone-in and walk-in business",
+      "propertyIds": "Property ids",
+      "propertyIdsHint": "Canonical property ids, comma-separated (e.g. tbo:1010062) — destination search arrives with the mapping service",
+      "checkIn": "Check-in",
+      "checkOut": "Check-out",
+      "adults": "Adults",
+      "nationality": "Nationality",
+      "nationalityHint": "ISO code — rates vary by it",
+      "currency": "Currency",
+      "search": "Search",
+      "streaming": "Searching suppliers…",
+      "budgetExhausted": "Partial results — some suppliers did not answer within the time budget",
+      "streamFailed": "The search stream failed — try again",
+      "refundable": "Refundable",
+      "nonRefundable": "Non-refundable",
+      "openInPortal": "Open in portal",
+      "openInPortalHint": "Booking on behalf completes in the Agent Portal in this milestone",
+      "empty": { "title": "No availability", "description": "No supplier returned rates for this search" },
+      "errors": { "form": "Fill property ids, dates and a 2-letter nationality" }
+    }
+  },
+  "bookingStates": {
+    "quoted": "Quoted",
+    "reserved": "Reserved",
+    "pending_confirmation": "Pending confirmation",
+    "confirmed": "Confirmed",
+    "issued": "Issued",
+    "amendment_pending": "Amendment pending",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "failed": "Failed"
+  },
+  "policy": {
+    "free": "Free cancellation",
+    "nonRefundable": "Non-refundable",
+    "until": "until",
+    "from": "from",
+    "now": "now"
+  },
+  "supplierErrors": {
+    "sold_out": "Sold out",
+    "price_changed": "Price changed",
+    "invalid_request": "Invalid request",
+    "supplier_timeout": "Supplier timeout",
+    "supplier_rejected": "Supplier rejected",
+    "auth_failed": "Authentication failed",
+    "rate_limited": "Rate limited",
+    "supplier_unavailable": "Supplier unavailable"
+  },
+  "roles": {
+    "admin": "Administrator",
+    "operations": "Operations",
+    "finance": "Finance",
+    "viewer": "Viewer"
+  },
+  "settings": {
+    "users": {
+      "title": "Users & roles",
+      "subtitle": "Your company's dashboard staff",
+      "listTitle": "Staff users",
+      "empty": "No staff users yet",
+      "invite": "Invite user",
+      "inviteTitle": "Invite a staff user",
+      "email": "Email",
+      "cancel": "Cancel",
+      "done": "Done",
+      "columns": { "name": "Name", "role": "Role", "totp": "2FA", "status": "Status" },
+      "totpOn": "Enabled",
+      "totpOff": "Not enrolled",
+      "statusActive": "Active",
+      "statusDisabled": "Disabled",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "deactivated": "User deactivated and signed out everywhere",
+      "activated": "User re-activated",
+      "roleSaved": "Role updated",
+      "confirmDeactivateTitle": "Deactivate this user?",
+      "initialPasswordTitle": "Initial password",
+      "initialPasswordNote": "Shown once — share it with the invitee over a secure channel. They should enable two-step verification after first sign-in.",
+      "policyTitle": "Security policy",
+      "policySubtitle": "Applies to every staff user of your company",
+      "enforceTotp": "Require two-step verification (TOTP) for all staff",
+      "policySaved": "Policy updated",
+      "errors": { "generic": "The change could not be saved", "emailTaken": "A user with this email already exists" }
+    },
+    "suppliers": {
+      "title": "Supplier accounts",
+      "subtitle": "Your company's own credentials per supplier — Jenova never trades on its own accounts",
+      "empty": "No suppliers in the platform catalog yet",
+      "environmentTabs": "Environment",
+      "sandbox": "Sandbox",
+      "production": "Production",
+      "configured": "Credentials saved",
+      "notConfigured": "No credentials saved",
+      "enabled": "Enabled for search & booking",
+      "updatedAt": "Updated",
+      "writeOnlyNote": "Credentials are write-only: they are encrypted on save and never displayed again. Entering new values replaces the stored ones.",
+      "vertical": { "hotel": "Hotels", "air": "Air", "ground": "Ground", "package": "Packages" },
+      "fields": { "apiUrl": "API base URL", "username": "Username", "password": "Password" },
+      "save": "Save credentials",
+      "saved": "Credentials saved",
+      "testConnection": "Test connection",
+      "testOk": "Connection OK — the supplier accepted the credentials",
+      "testFailed": "Connection failed: {kind}",
+      "errors": { "saveFailed": "The credentials could not be saved" }
+    },
+    "branding": {
+      "title": "Branding",
+      "subtitle": "Identity used on documents and portals",
+      "identity": "Company identity",
+      "legalName": "Legal name",
+      "legalNameHint": "Appears on vouchers and invoices",
+      "brandColor": "Brand color",
+      "logo": "Logo",
+      "logoHint": "PNG, JPEG, SVG or WebP — up to 512 KB",
+      "logoAlt": "Company logo",
+      "uploadLogo": "Upload logo",
+      "logoSaved": "Logo uploaded",
+      "save": "Save",
+      "saved": "Branding saved",
+      "errors": {
+        "saveFailed": "Branding could not be saved",
+        "uploadFailed": "The logo could not be uploaded",
+        "badLogo": "Unsupported file type or size",
+        "storeUnconfigured": "Object storage is not configured for this environment"
+      }
+    },
+    "account": {
+      "title": "Account settings",
+      "profile": "Profile",
+      "totp": {
+        "title": "Two-step verification (TOTP)",
+        "subtitle": "A rotating code from an authenticator app at sign-in",
+        "enforced": "Your company policy requires two-step verification — enable it below",
+        "enabled": "Enabled",
+        "notEnrolled": "Two-step verification is not enabled for your account",
+        "enable": "Enable",
+        "scan": "Scan the QR code with your authenticator app",
+        "qrAlt": "Enrollment QR code",
+        "manualEntry": "Or enter the key manually:",
+        "codeLabel": "Enter the code shown in the app",
+        "activate": "Confirm activation",
+        "cancel": "Cancel",
+        "activated": "Two-step verification is now enabled",
+        "errors": {
+          "enrollFailed": "Could not start enrollment",
+          "invalidCode": "The code is not valid"
+        }
+      }
+    }
+  }
+}

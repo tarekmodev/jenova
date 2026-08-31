@@ -42,11 +42,13 @@ export {
 export {
   accountBalance,
   assertLedgerBalanced,
+  journalEntriesOfBooking,
   journalEntriesOfGroup,
   requirePostingTemplate,
   trialBalance,
   unbalancedTransactionGroups,
   type AccountBalance,
+  type BookingJournalLine,
   type PostingAmounts,
   type UnbalancedGroup,
 } from "./ledger/service";

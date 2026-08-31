@@ -38,6 +38,18 @@ const apiEnvSchema = z.object({
   // Hard total budget for one hotel search fan-out (docs/02: ~8s hotels).
   // Platform-level; the service clamps any value to its safe bounds.
   HOTEL_SEARCH_BUDGET_MS: z.coerce.number().int().min(500).max(30_000).default(8_000),
+  // At-rest data key for sealed tenant secrets (supplier credentials, staff
+  // TOTP secrets) — 32 bytes, base64. Optional so surfaces that never touch
+  // sealed secrets still boot; the SecretBox fails loudly ON USE when the
+  // key is absent (tenancy/secret-box.ts). JENOVA_DATA_KEY_ID labels blobs
+  // for rotation (docs/08: per-tenant KMS-wrapped keys slot in later).
+  JENOVA_DATA_KEY: z
+    .string()
+    .refine((value) => Buffer.from(value, "base64").length === 32, {
+      message: "must be 32 bytes of base64",
+    })
+    .optional(),
+  JENOVA_DATA_KEY_ID: z.string().min(1).default("env-v1"),
   // --- Documents v1 (M2 #99): object store for rendered PDFs + Typst -----
   // The S3 block is all-or-nothing: fully set → documents enabled; fully
   // unset → the voucher endpoint answers documents_unavailable; partial →
@@ -113,6 +125,9 @@ export interface ApiConfig {
   readonly tenantRuntimeDsn: string;
   readonly offerSigningKey: string;
   readonly hotelSearchBudgetMs: number;
+  /** null = sealed-secret features refuse loudly on use (never a silent fallback). */
+  readonly dataKey: string | null;
+  readonly dataKeyId: string;
   /** Null = documents disabled (no S3 block configured). */
   readonly documents: DocumentsConfig | null;
 }
@@ -147,6 +162,8 @@ export function loadApiConfig(env: Readonly<Record<string, string | undefined>>)
     tenantRuntimeDsn: parsed.data.JENOVA_TENANT_RUNTIME_DSN,
     offerSigningKey: parsed.data.OFFER_SIGNING_KEY,
     hotelSearchBudgetMs: parsed.data.HOTEL_SEARCH_BUDGET_MS,
+    dataKey: parsed.data.JENOVA_DATA_KEY ?? null,
+    dataKeyId: parsed.data.JENOVA_DATA_KEY_ID,
     documents: resolveDocumentsConfig(parsed.data),
   });
 }

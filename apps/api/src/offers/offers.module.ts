@@ -18,10 +18,15 @@ import {
   EnvSupplierCredentialsSource,
   SUPPLIER_CREDENTIALS_SOURCE,
   SUPPLIER_REGISTRY,
-  UnboundSupplierCredentialsSource,
   type SupplierCredentialsSource,
   type SupplierRegistry,
 } from "@jenova/supplier-registry";
+import type { SecretBox } from "../tenancy/secret-box";
+import { SECRET_BOX } from "../tenancy/secret-box";
+import {
+  DrizzleSupplierCredentialsSource,
+  FallbackSupplierCredentialsSource,
+} from "../tenancy/supplier-credentials";
 import { TENANT_DB_RESOLVER, TenantDbModule } from "../tenancy/tenant-db.module";
 import { OFFER_CHECK_SERVICE, OfferCheckService } from "./check.service";
 import { DrizzleOfferStore, OFFER_STORE, type OfferStore } from "./offer-store";
@@ -63,16 +68,28 @@ import {
       useFactory: () => createSupplierRegistry(),
     },
     {
-      // supplier_account decryption binds here when the secret-store wiring
-      // lands. Until then: development uses the repo .env sandbox credentials
-      // (real credentials, the tenant's own sandbox account — never fakes);
-      // every other environment fails loudly.
+      // Tenant supplier_account rows, sealed at rest, decrypted at call
+      // time (M2 #91 — the promised secret-store wiring). Production trades
+      // on production accounts; everything else on sandbox. Development
+      // additionally falls back to the repo .env sandbox credentials for
+      // tenants that have not saved an account yet (real credentials, the
+      // tenant's own sandbox — never fakes).
       provide: SUPPLIER_CREDENTIALS_SOURCE,
-      inject: [API_CONFIG],
-      useFactory: (config: ApiConfig): SupplierCredentialsSource =>
-        config.nodeEnv === "development"
-          ? new EnvSupplierCredentialsSource()
-          : new UnboundSupplierCredentialsSource(),
+      inject: [API_CONFIG, TENANT_DB_RESOLVER, SECRET_BOX],
+      useFactory: (
+        config: ApiConfig,
+        resolver: TenantDbResolver,
+        secrets: SecretBox,
+      ): SupplierCredentialsSource => {
+        const stored = new DrizzleSupplierCredentialsSource(
+          resolver,
+          secrets,
+          config.nodeEnv === "production" ? "production" : "sandbox",
+        );
+        return config.nodeEnv === "development"
+          ? new FallbackSupplierCredentialsSource(stored, new EnvSupplierCredentialsSource())
+          : stored;
+      },
     },
     {
       provide: OFFER_CHECK_SERVICE,

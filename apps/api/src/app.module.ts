@@ -16,6 +16,7 @@ import { HotelBookingModule } from "./hotel-booking/hotel-booking.module";
 import { HotelSearchModule } from "./hotel-search/hotel-search.module";
 import { OffersModule } from "./offers/offers.module";
 import { PricingModule } from "./pricing/pricing.module";
+import { StaffModule } from "./staff/staff.module";
 import { HealthController } from "./health/health.controller";
 import { READINESS_CHECKS } from "./health/readiness";
 import { HTTP_SERVER_HOOKS, noopHttpServerHooks } from "./observability/instrumentation";
@@ -33,6 +34,7 @@ import { HTTP_SERVER_HOOKS, noopHttpServerHooks } from "./observability/instrume
     OffersModule,
     HotelSearchModule,
     HotelBookingModule,
+    StaffModule,
     DocumentsModule,
   ],
   controllers: [HealthController],

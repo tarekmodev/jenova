@@ -2,12 +2,27 @@
   "name": "@jenova/dashboard",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start -p 3100",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@jenova/domain": "workspace:*",
+    "@jenova/ui": "workspace:*",
+    "next": "^15.1.6",
+    "next-intl": "^4.3.4",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

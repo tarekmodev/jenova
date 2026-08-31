@@ -5,6 +5,10 @@ packages:
   - "e2e"
 
 allowBuilds:
+  # next-intl transitive tooling: both ship prebuilt binaries; their build
+  # scripts are native-compile fallbacks we never need on supported hosts.
+  '@parcel/watcher': false
+  '@swc/core': false
   # Nest core pulls @scarf/scarf, whose postinstall is install analytics — never run it.
   '@scarf/scarf': false
   # argon2's install script is node-gyp-build: it RESOLVES the shipped

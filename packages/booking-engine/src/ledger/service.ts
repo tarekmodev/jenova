@@ -214,3 +214,43 @@ export async function journalEntriesOfGroup(db: TenantDbOrTx, transactionGroupId
     .from(journalEntries)
     .where(eq(journalEntries.transactionGroupId, transactionGroupId));
 }
+
+export interface BookingJournalLine {
+  readonly id: string;
+  readonly transactionGroupId: string;
+  readonly accountCode: string;
+  readonly accountName: string;
+  /** Signed minor units: debit positive, credit negative (0001 check). */
+  readonly amount: bigint;
+  readonly currency: string;
+  readonly bookingItemId: string | null;
+  readonly memo: string | null;
+  readonly postedAt: Date;
+}
+
+/**
+ * Every posting of one booking, account codes joined in — the core
+ * workspace's "ledger postings" panel is THIS read (financial views are
+ * ledger reads, never recomputations — CLAUDE.md rule 7).
+ */
+export async function journalEntriesOfBooking(
+  db: TenantDbOrTx,
+  bookingId: string,
+): Promise<readonly BookingJournalLine[]> {
+  return db
+    .select({
+      id: journalEntries.id,
+      transactionGroupId: journalEntries.transactionGroupId,
+      accountCode: ledgerAccounts.code,
+      accountName: ledgerAccounts.name,
+      amount: journalEntries.amount,
+      currency: journalEntries.currency,
+      bookingItemId: journalEntries.bookingItemId,
+      memo: journalEntries.memo,
+      postedAt: journalEntries.postedAt,
+    })
+    .from(journalEntries)
+    .innerJoin(ledgerAccounts, eq(journalEntries.accountId, ledgerAccounts.id))
+    .where(eq(journalEntries.bookingId, bookingId))
+    .orderBy(journalEntries.postedAt, journalEntries.id);
+}

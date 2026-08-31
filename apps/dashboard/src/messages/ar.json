@@ -1,0 +1,277 @@
+{
+  "login": {
+    "title": "جينوفا",
+    "subtitle": "لوحة التحكم الداخلية",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "totpCode": "رمز التحقق",
+    "totpHint": "أدخل الرمز من تطبيق المصادقة",
+    "signIn": "تسجيل الدخول",
+    "verify": "تحقق",
+    "errors": {
+      "unauthorized": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+      "totp_required": "رمز التحقق مطلوب",
+      "totp_invalid": "رمز التحقق غير صحيح",
+      "internal_error": "تعذر تسجيل الدخول — حاول مرة أخرى"
+    }
+  },
+  "nav": {
+    "sections": {
+      "workspace": "مساحة العمل",
+      "apps": "التطبيقات",
+      "settings": "الإعدادات"
+    },
+    "bookings": "الحجوزات",
+    "queue": "قائمة التدخل اليدوي",
+    "searchConsole": "وحدة البحث",
+    "users": "المستخدمون والأدوار",
+    "suppliers": "حسابات الموردين",
+    "branding": "الهوية التجارية",
+    "account": "حسابي",
+    "app": {
+      "b2b": "وكلاء B2B",
+      "corporate": "الشركات",
+      "finance": "المالية",
+      "api_access": "الوصول البرمجي API",
+      "storefront": "المتجر الإلكتروني",
+      "crm": "إدارة العملاء CRM",
+      "desk": "مكتب الدعم",
+      "contracting": "التعاقدات"
+    }
+  },
+  "shell": {
+    "collapseNav": "طي القائمة",
+    "openNav": "فتح القائمة",
+    "accountSettings": "إعدادات الحساب",
+    "logout": "تسجيل الخروج"
+  },
+  "forbidden": {
+    "title": "التطبيق غير مثبت",
+    "description": "هذا التطبيق غير مفعّل لمنشأتك. تواصل مع مدير النظام."
+  },
+  "appSection": {
+    "placeholder": "هذا التطبيق مثبت، وستصل واجهته في مرحلته من خطة البناء."
+  },
+  "workspace": {
+    "bookings": {
+      "title": "الحجوزات",
+      "subtitle": "جميع الحجوزات من كل القنوات",
+      "columns": {
+        "reference": "المرجع",
+        "state": "الحالة",
+        "channel": "القناة",
+        "supplier": "المورد",
+        "sell": "سعر البيع",
+        "created": "تاريخ الإنشاء"
+      },
+      "filters": {
+        "state": "الحالة",
+        "supplier": "المورد",
+        "from": "من",
+        "to": "إلى",
+        "any": "الكل",
+        "apply": "تطبيق"
+      },
+      "empty": {
+        "title": "لا توجد حجوزات بعد",
+        "description": "تظهر هنا الحجوزات من جميع القنوات فور إنشائها"
+      }
+    },
+    "detail": {
+      "channel": "القناة",
+      "paymentState": "الدفع",
+      "net": "الصافي",
+      "sell": "سعر البيع",
+      "cancellationPolicy": "سياسة الإلغاء",
+      "history": "سجل الحالات",
+      "historySubtitle": "من سجل التدقيق غير القابل للتعديل",
+      "historyEmpty": "لا توجد أحداث مسجلة",
+      "ledger": "قيود دفتر الأستاذ",
+      "ledgerSubtitle": "قيود مزدوجة لهذا الحجز — تُقرأ من الدفتر ولا يعاد حسابها",
+      "ledgerEmpty": "لا توجد قيود بعد",
+      "ledgerColumns": { "account": "الحساب", "memo": "البيان", "amount": "المبلغ", "postedAt": "تاريخ القيد" },
+      "documents": "المستندات",
+      "documentsEmpty": "لا توجد مستندات بعد",
+      "documentsNote": "تظهر القسائم والفواتير هنا عند إطلاق توليد المستندات"
+    },
+    "queue": {
+      "title": "التدخل اليدوي",
+      "subtitle": "عناصر لم تستطع الأتمتة حسمها بأمان",
+      "age": "منذ",
+      "retryPoll": "إعادة الاستعلام من المورد",
+      "markResolved": "اعتبارها محلولة",
+      "openBooking": "فتح الحجز",
+      "resolveTitle": "اعتبار هذا التصعيد محلولًا",
+      "resolveNote": "ما الذي تم عمله",
+      "cancel": "إلغاء",
+      "resolved": "تم حل التصعيد",
+      "outcomes": {
+        "transitioned_confirmed": "أكد المورد الحجز — تم حسم العنصر",
+        "transitioned_cancelled": "أفاد المورد بالإلغاء — تم حسم العنصر",
+        "transitioned_failed": "أفاد المورد بالفشل — تم حسم العنصر",
+        "still_pending": "لا يزال معلقًا لدى المورد — لا تغيير",
+        "retrieve_failed": "تعذر الوصول إلى المورد",
+        "escalated": "لا يزال مصعّدًا",
+        "conflict_skipped": "عملية أخرى حسمت العنصر أولًا",
+        "error": "فشلت إعادة المحاولة بشكل غير متوقع"
+      },
+      "empty": {
+        "title": "لا يوجد ما يتطلب التدخل",
+        "description": "تظهر هنا الحجوزات المصعّدة مع القرار المطلوب بالضبط"
+      },
+      "errors": { "actionFailed": "تعذر إتمام الإجراء" }
+    },
+    "search": {
+      "title": "وحدة البحث",
+      "subtitle": "بحث الموظفين لخدمة الاتصالات الهاتفية والزيارات المباشرة",
+      "propertyIds": "معرّفات الفنادق",
+      "propertyIdsHint": "معرّفات قياسية مفصولة بفواصل (مثل tbo:1010062) — البحث بالوجهة يصل مع خدمة المطابقة",
+      "checkIn": "تاريخ الوصول",
+      "checkOut": "تاريخ المغادرة",
+      "adults": "البالغون",
+      "nationality": "الجنسية",
+      "nationalityHint": "رمز ISO — تختلف الأسعار بحسبها",
+      "currency": "العملة",
+      "search": "بحث",
+      "streaming": "جارٍ البحث لدى الموردين…",
+      "budgetExhausted": "نتائج جزئية — بعض الموردين لم يجب ضمن المهلة",
+      "streamFailed": "فشل بث البحث — حاول مرة أخرى",
+      "refundable": "قابل للاسترداد",
+      "nonRefundable": "غير قابل للاسترداد",
+      "openInPortal": "فتح في البوابة",
+      "openInPortalHint": "يكتمل الحجز بالنيابة في بوابة الوكلاء في هذه المرحلة",
+      "empty": { "title": "لا توجد إتاحة", "description": "لم يرجع أي مورد أسعارًا لهذا البحث" },
+      "errors": { "form": "أدخل معرّفات الفنادق والتواريخ وجنسية من حرفين" }
+    }
+  },
+  "bookingStates": {
+    "quoted": "مسعّر",
+    "reserved": "محجوز مبدئيًا",
+    "pending_confirmation": "بانتظار التأكيد",
+    "confirmed": "مؤكد",
+    "issued": "صادر",
+    "amendment_pending": "تعديل معلق",
+    "completed": "مكتمل",
+    "cancelled": "ملغى",
+    "failed": "فاشل"
+  },
+  "policy": {
+    "free": "إلغاء مجاني",
+    "nonRefundable": "غير قابل للاسترداد",
+    "until": "حتى",
+    "from": "من",
+    "now": "الآن"
+  },
+  "supplierErrors": {
+    "sold_out": "نفدت الإتاحة",
+    "price_changed": "تغيّر السعر",
+    "invalid_request": "طلب غير صالح",
+    "supplier_timeout": "انتهت مهلة المورد",
+    "supplier_rejected": "رفض المورد الطلب",
+    "auth_failed": "فشل التحقق من بيانات الاعتماد",
+    "rate_limited": "تجاوز حد الطلبات",
+    "supplier_unavailable": "المورد غير متاح"
+  },
+  "roles": {
+    "admin": "مدير",
+    "operations": "العمليات",
+    "finance": "المالية",
+    "viewer": "مشاهد"
+  },
+  "settings": {
+    "users": {
+      "title": "المستخدمون والأدوار",
+      "subtitle": "موظفو لوحة التحكم في منشأتك",
+      "listTitle": "المستخدمون",
+      "empty": "لا يوجد مستخدمون بعد",
+      "invite": "دعوة مستخدم",
+      "inviteTitle": "دعوة مستخدم جديد",
+      "email": "البريد الإلكتروني",
+      "cancel": "إلغاء",
+      "done": "تم",
+      "columns": { "name": "الاسم", "role": "الدور", "totp": "التحقق بخطوتين", "status": "الحالة" },
+      "totpOn": "مفعّل",
+      "totpOff": "غير مفعّل",
+      "statusActive": "نشط",
+      "statusDisabled": "موقوف",
+      "deactivate": "إيقاف",
+      "activate": "تنشيط",
+      "deactivated": "تم إيقاف المستخدم وإنهاء جلساته",
+      "activated": "تم تنشيط المستخدم",
+      "roleSaved": "تم تحديث الدور",
+      "confirmDeactivateTitle": "إيقاف هذا المستخدم؟",
+      "initialPasswordTitle": "كلمة المرور الأولية",
+      "initialPasswordNote": "تظهر مرة واحدة فقط — شاركها مع المدعو عبر قناة آمنة، وعليه تفعيل التحقق بخطوتين بعد أول تسجيل دخول.",
+      "policyTitle": "سياسة الأمان",
+      "policySubtitle": "تسري على جميع موظفي المنشأة",
+      "enforceTotp": "إلزام جميع الموظفين بالتحقق بخطوتين (TOTP)",
+      "policySaved": "تم تحديث السياسة",
+      "errors": { "generic": "تعذر حفظ التغيير", "emailTaken": "يوجد مستخدم بهذا البريد الإلكتروني" }
+    },
+    "suppliers": {
+      "title": "حسابات الموردين",
+      "subtitle": "بيانات اعتماد منشأتك الخاصة لدى كل مورد — جينوفا لا تتاجر بحسابات خاصة بها",
+      "empty": "لا يوجد موردون في دليل المنصة بعد",
+      "environmentTabs": "البيئة",
+      "sandbox": "تجريبية",
+      "production": "إنتاجية",
+      "configured": "بيانات الاعتماد محفوظة",
+      "notConfigured": "لا توجد بيانات اعتماد",
+      "enabled": "مفعّل للبحث والحجز",
+      "updatedAt": "آخر تحديث",
+      "writeOnlyNote": "بيانات الاعتماد للكتابة فقط: تُشفَّر عند الحفظ ولا تُعرض مرة أخرى، وإدخال قيم جديدة يستبدل المخزنة.",
+      "vertical": { "hotel": "فنادق", "air": "طيران", "ground": "خدمات أرضية", "package": "باقات" },
+      "fields": { "apiUrl": "عنوان الخدمة API", "username": "اسم المستخدم", "password": "كلمة المرور" },
+      "save": "حفظ بيانات الاعتماد",
+      "saved": "تم حفظ بيانات الاعتماد",
+      "testConnection": "اختبار الاتصال",
+      "testOk": "الاتصال ناجح — قبل المورد بيانات الاعتماد",
+      "testFailed": "فشل الاتصال: {kind}",
+      "errors": { "saveFailed": "تعذر حفظ بيانات الاعتماد" }
+    },
+    "branding": {
+      "title": "الهوية التجارية",
+      "subtitle": "الهوية المستخدمة في المستندات والبوابات",
+      "identity": "هوية المنشأة",
+      "legalName": "الاسم القانوني",
+      "legalNameHint": "يظهر على القسائم والفواتير",
+      "brandColor": "لون الهوية",
+      "logo": "الشعار",
+      "logoHint": "PNG أو JPEG أو SVG أو WebP — حتى 512 كيلوبايت",
+      "logoAlt": "شعار المنشأة",
+      "uploadLogo": "رفع الشعار",
+      "logoSaved": "تم رفع الشعار",
+      "save": "حفظ",
+      "saved": "تم حفظ الهوية",
+      "errors": {
+        "saveFailed": "تعذر حفظ الهوية",
+        "uploadFailed": "تعذر رفع الشعار",
+        "badLogo": "نوع الملف أو حجمه غير مدعوم",
+        "storeUnconfigured": "التخزين السحابي غير مهيأ في هذه البيئة"
+      }
+    },
+    "account": {
+      "title": "إعدادات الحساب",
+      "profile": "الملف الشخصي",
+      "totp": {
+        "title": "التحقق بخطوتين (TOTP)",
+        "subtitle": "رمز متغيّر من تطبيق مصادقة عند تسجيل الدخول",
+        "enforced": "سياسة المنشأة توجب تفعيل التحقق بخطوتين — فعّله أدناه",
+        "enabled": "مفعّل",
+        "notEnrolled": "التحقق بخطوتين غير مفعّل لحسابك",
+        "enable": "تفعيل",
+        "scan": "امسح رمز QR بتطبيق المصادقة",
+        "qrAlt": "رمز QR للتسجيل",
+        "manualEntry": "أو أدخل المفتاح يدويًا:",
+        "codeLabel": "أدخل الرمز الظاهر في التطبيق",
+        "activate": "تأكيد التفعيل",
+        "cancel": "إلغاء",
+        "activated": "تم تفعيل التحقق بخطوتين",
+        "errors": {
+          "enrollFailed": "تعذر بدء التفعيل",
+          "invalidCode": "الرمز غير صحيح"
+        }
+      }
+    }
+  }
+}

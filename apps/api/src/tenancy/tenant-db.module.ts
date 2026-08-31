@@ -19,13 +19,16 @@ import {
 } from "@jenova/db";
 import { API_CONFIG, type ApiConfig } from "../config/config";
 import { ConfigModule } from "../config/config.module";
+import { secretBoxFromConfig, SECRET_BOX } from "./secret-box";
 
 /** Nest injection token for the process-wide {@link TenantDbResolver}. */
 export const TENANT_DB_RESOLVER = Symbol("jenova.api.tenantDbResolver");
 
 /**
- * Nest injection token for the process-wide control-plane client (documents
- * read the Tenant row for legal name + branding — platform-level data).
+ * Nest injection token for the process-wide control-plane client — the
+ * read path for platform-level data (tenant directory, app installations,
+ * supplier catalog, branding). Tenant-operational data NEVER lives behind
+ * this token (CLAUDE.md rule 1) — that is the resolver's door.
  */
 export const CONTROL_PLANE_CLIENT = Symbol("jenova.api.controlPlaneClient");
 
@@ -78,8 +81,15 @@ class TenantDbLifecycle implements OnApplicationShutdown {
       inject: [TENANT_DB_RUNTIME],
       useFactory: (runtime: TenantDbRuntime) => runtime.controlPlane,
     },
+    {
+      // Sealed-secret box (tenancy concern: supplier credentials, staff
+      // TOTP secrets). Unconfigured key ⇒ fail-on-use, never plaintext.
+      provide: SECRET_BOX,
+      inject: [API_CONFIG],
+      useFactory: (config: ApiConfig) => secretBoxFromConfig(config),
+    },
     TenantDbLifecycle,
   ],
-  exports: [TENANT_DB_RESOLVER, CONTROL_PLANE_CLIENT],
+  exports: [TENANT_DB_RESOLVER, CONTROL_PLANE_CLIENT, SECRET_BOX],
 })
 export class TenantDbModule {}

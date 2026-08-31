@@ -49,6 +49,7 @@ import {
   tboBookingDetailResponseSchema,
   tboBookResponseSchema,
   tboCancelResponseSchema,
+  tboEnvelopeSchema,
   tboSearchResponseSchema,
   type TboStatus,
 } from "./schemas";
@@ -89,6 +90,24 @@ class TboHotelAdapter implements HotelSupplierAdapter {
     this.client = new TboClient(options.transport);
     this.#onSkippedRoomRate =
       options.onSkippedRoomRate ?? createSkippedRoomRateLog().observer;
+  }
+
+  /**
+   * Credential probe for the Settings "test connection" button: GET
+   * CountryList — TBO's cheapest authenticated static-content read, never
+   * a search (look-to-book discipline). Wrong credentials surface as the
+   * taxonomy's auth_failed (observed live: HTTP 401, and Status 401 inside
+   * an HTTP 200 envelope — both mapped in errors.ts).
+   */
+  async testConnection(ctx: AdapterCallContext): Promise<void> {
+    const response = await this.client.call(ctx, "countryList");
+    assertHttpOk(response, "testConnection");
+    const body = parseJsonWith(tboEnvelopeSchema, response.body, {
+      supplierCode: TBO_SUPPLIER_CODE,
+    });
+    if (body.Status.Code !== TBO_STATUS_OK) {
+      throw supplierErrorFromStatus(body.Status, "testConnection");
+    }
   }
 
   async search(
