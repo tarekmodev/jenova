@@ -85,9 +85,10 @@ export interface HotelOfferSummary {
   readonly sell: Money;
   readonly refundable: boolean;
   /**
-   * The normalized policy snapshot the offer was issued with (deadlines in
-   * UTC, penalties as Money) — display data for the offer card/detail; the
-   * BOOKED terms are always the snapshot on the signed offer row (#96).
+   * The SELL-side policy snapshot the offer was issued with (deadlines in
+   * UTC, penalties as sell-scaled Money — review H1: net penalties disclose
+   * the tenant's buy rate) — display data for the offer card/detail; the
+   * BOOKED terms are always the snapshots on the signed offer row (#96).
    */
   readonly cancellationPolicy: CancellationPolicy;
 }
@@ -183,6 +184,18 @@ function assertValidRequest(request: HotelSearchRequest): void {
       }
     }
   }
+}
+
+/**
+ * Hotel offers always carry a policy, and pricing derives the sell-side
+ * twin from it — a null here is an assembly bug, never a client state
+ * (review H1: the agency surface must NEVER fall back to the net policy).
+ */
+function requireSellPolicy(policy: CancellationPolicy | null): CancellationPolicy {
+  if (policy === null) {
+    throw new Error("priced hotel offer is missing its sell-side policy snapshot");
+  }
+  return policy;
 }
 
 function nightsBetween(checkIn: string, checkOut: string): number {
@@ -431,7 +444,7 @@ export class HotelSearchService {
         boardBasis: offer.boardBasis,
         sell: priced.sell,
         refundable: offer.cancellationPolicy.refundable,
-        cancellationPolicy: offer.cancellationPolicy,
+        cancellationPolicy: requireSellPolicy(priced.sellPolicySnapshot),
       });
     }
     return summaries;

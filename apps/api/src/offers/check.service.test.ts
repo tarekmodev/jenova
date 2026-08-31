@@ -183,6 +183,60 @@ describe("checkOffer — unchanged", () => {
   });
 });
 
+describe("checkOffer — agency-facing policy is SELL-side (review H1)", () => {
+  it("serializes penalties scaled to sell; the net figure appears nowhere", async () => {
+    const h = harness();
+    // Marked-up offer: net 50_000 → sell 55_000 (+10%, VAT-inclusive).
+    const resolution = resolvePrice(money(50_000, "SAR"), CONTEXT, [
+      {
+        id: "rule-10pct",
+        priority: 0,
+        agencyId: null,
+        channel: null,
+        vertical: "hotel",
+        supplierCode: null,
+        destination: null,
+        travelFrom: null,
+        travelTo: null,
+        valueType: "percent",
+        value: 1_000n,
+        currency: null,
+        commissionSplitBps: null,
+        active: true,
+      },
+    ]);
+    const priced = assemblePricedOffer(
+      {
+        supplierCode: "sup-a",
+        vertical: "hotel",
+        policySnapshot: POLICY,
+        expiresAt: new Date(h.clock.now + 10 * 60_000),
+      },
+      resolution,
+    );
+    const issued = await h.offersService.issueOffer(TENANT, {
+      offer: priced,
+      supplierOfferToken: "opaque-token-1",
+      canonicalPropertyId: "prop-1",
+      nationality: "SA",
+      occupancy: [{ adults: 2, childAges: [] }],
+      pricingContext: CONTEXT,
+    });
+    h.adapter.onCheck = () => h.echo();
+
+    const result = await h.service.checkOffer(TENANT, issued.offerToken);
+    expect(result.status).toBe("unchanged");
+    if (result.status !== "unchanged") throw new Error("unreachable");
+    expect(result.sell).toEqual(money(55_000, "SAR"));
+    // POLICY's 50_000 penalty is 100% of net → EXACTLY 100% of sell.
+    expect(result.cancellationPolicy?.rules).toEqual([
+      { fromUtc: "2026-09-10T00:00:00.000Z", penalty: money(55_000, "SAR") },
+    ]);
+    // The net-derived amount never crosses to the agency realm.
+    expect(JSON.stringify(result)).not.toContain("50000");
+  });
+});
+
 describe("checkOffer — price changed", () => {
   it("persists the new supplier state as a NEW signed offer and returns the delta", async () => {
     const h = harness();

@@ -185,6 +185,8 @@ describe.skipIf(!available)("pending-confirmation worker over recorded TBO traff
       net: record.net,
       sell: record.net,
       policySnapshot: record.cancellationPolicy,
+      // sell === net in this harness, so the sell-side policy is identical.
+      sellPolicySnapshot: record.cancellationPolicy,
       actor: ACTOR,
     });
     return created.item.id;

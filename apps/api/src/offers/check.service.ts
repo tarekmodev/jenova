@@ -54,7 +54,10 @@ export type CheckOfferResult =
       readonly sell: Money;
       readonly expiresAt: Date;
       readonly checkedAt: Date;
-      /** Policy snapshot in force on the bookable offer (display; #97). */
+      /**
+       * SELL-side policy in force on the bookable offer (display; #97).
+       * Never the net policy — net penalties are confidential (review H1).
+       */
       readonly cancellationPolicy: CancellationPolicy | null;
     }
   | {
@@ -67,7 +70,7 @@ export type CheckOfferResult =
       readonly newExpiresAt: Date;
       /** True when the cancellation policy moved (with or without the price). */
       readonly policyChanged: boolean;
-      /** The successor's policy snapshot — what re-approval accepts (#97). */
+      /** The successor's SELL-side policy — what re-approval accepts (#97). */
       readonly newCancellationPolicy: CancellationPolicy | null;
     };
 
@@ -153,7 +156,7 @@ export class OfferCheckService {
         sell: offer.sell,
         expiresAt: offer.expiresAt,
         checkedAt,
-        cancellationPolicy: offer.policySnapshot,
+        cancellationPolicy: offer.sellPolicySnapshot,
       };
     }
 
@@ -181,7 +184,7 @@ export class OfferCheckService {
         sell: successor.record.sell,
         expiresAt: successor.record.expiresAt,
         checkedAt: successor.checkedAt,
-        cancellationPolicy: successor.record.policySnapshot,
+        cancellationPolicy: successor.record.sellPolicySnapshot,
       };
     }
 
@@ -193,7 +196,7 @@ export class OfferCheckService {
       newOfferToken: successor.token,
       newExpiresAt: successor.record.expiresAt,
       policyChanged: !policyUnchanged,
-      newCancellationPolicy: successor.record.policySnapshot,
+      newCancellationPolicy: successor.record.sellPolicySnapshot,
     };
   }
 

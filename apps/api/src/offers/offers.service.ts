@@ -229,6 +229,7 @@ export class OffersService {
       priceHash: "", // replaced by withPriceHash
       markupRuleId: offer.markupRuleId,
       policySnapshot: offer.policySnapshot,
+      sellPolicySnapshot: offer.sellPolicySnapshot,
       expiresAt: offer.expiresAt,
       supplierOfferToken: input.supplierOfferToken,
       canonicalPropertyId: input.canonicalPropertyId,

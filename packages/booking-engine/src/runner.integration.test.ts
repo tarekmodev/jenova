@@ -113,6 +113,7 @@ describe.skipIf(!available)("BookingTransitionRunner on tenant Postgres", () => 
       net: NET,
       sell: SELL,
       policySnapshot: POLICY,
+      sellPolicySnapshot: POLICY,
       actor: ACTOR,
     });
     expect(created.created).toBe(true);
@@ -321,6 +322,7 @@ describe.skipIf(!available)("BookingTransitionRunner on tenant Postgres", () => 
       net: NET,
       sell: SELL,
       policySnapshot: POLICY,
+      sellPolicySnapshot: POLICY,
       actor: ACTOR,
     };
     const first = await runner.createHotelBooking(tenant, input);

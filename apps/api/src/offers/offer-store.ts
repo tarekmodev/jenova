@@ -37,7 +37,10 @@ export interface StoredOffer {
   readonly sell: Money;
   readonly priceHash: string;
   readonly markupRuleId: string | null;
+  /** NET-side policy — internal truth; never serialized to the agency realm. */
   readonly policySnapshot: CancellationPolicy | null;
+  /** SELL-side policy for agency display (review H1); null on pre-0007 rows. */
+  readonly sellPolicySnapshot: CancellationPolicy | null;
   readonly expiresAt: Date;
   readonly createdAt: Date;
   readonly supplierOfferToken: string | null;
@@ -63,6 +66,7 @@ export interface NewOfferRecord {
   readonly priceHash: string;
   readonly markupRuleId: string | null;
   readonly policySnapshot: CancellationPolicy | null;
+  readonly sellPolicySnapshot: CancellationPolicy | null;
   readonly expiresAt: Date;
   readonly supplierOfferToken: string;
   readonly canonicalPropertyId: string;
@@ -128,6 +132,7 @@ function toStoredOffer(row: OfferRow): StoredOffer {
     priceHash: row.priceHash,
     markupRuleId: row.markupRuleId,
     policySnapshot: row.policySnapshot,
+    sellPolicySnapshot: row.sellPolicySnapshot,
     expiresAt: row.expiresAt,
     createdAt: row.createdAt,
     supplierOfferToken: row.supplierOfferToken,
@@ -155,6 +160,7 @@ function toInsertRow(record: NewOfferRecord): OfferInsert {
     priceHash: record.priceHash,
     markupRuleId: record.markupRuleId,
     policySnapshot: record.policySnapshot,
+    sellPolicySnapshot: record.sellPolicySnapshot,
     expiresAt: record.expiresAt,
     supplierOfferToken: record.supplierOfferToken,
     canonicalPropertyId: record.canonicalPropertyId,

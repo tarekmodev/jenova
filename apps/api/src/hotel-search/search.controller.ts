@@ -161,7 +161,9 @@ const CANCELLATION_POLICY_SCHEMA = {
     rules: {
       type: "array",
       description:
-        "Ordered by fromUtc; each penalty applies from its UTC instant until the next rule.",
+        "Ordered by fromUtc; each penalty applies from its UTC instant until the next rule. " +
+        "Penalties are SELL-side amounts (what the agency would be charged) — supplier net " +
+        "terms never leave the engine.",
       items: {
         type: "object",
         required: ["fromUtc", "penalty"],

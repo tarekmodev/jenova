@@ -16,6 +16,7 @@
 import type { CancellationPolicy, Vertical } from "@jenova/domain";
 import { isVertical } from "@jenova/domain";
 import { PricingInputError } from "./errors";
+import { toSellCancellationPolicy } from "./sell-policy";
 import type { PriceBreakdown, PriceResolution } from "./resolve";
 
 /** What the search layer knows about the product being offered. */
@@ -44,7 +45,14 @@ export interface PricedOffer {
   /** markup_rule id that fired; null when no rule matched. */
   readonly markupRuleId: string | null;
   readonly breakdown: PriceBreakdown;
+  /** NET-side policy — internal truth (supplier settlement, ledger). */
   readonly policySnapshot: CancellationPolicy | null;
+  /**
+   * SELL-side policy — the ONLY policy any agency-facing surface may
+   * serialize (review H1: net penalties disclose the tenant's buy rate).
+   * Derived once here at pricing time; see pricing/sell-policy.ts.
+   */
+  readonly sellPolicySnapshot: CancellationPolicy | null;
   readonly expiresAt: Date;
 }
 
@@ -82,6 +90,27 @@ export function assemblePricedOffer(
     markupRuleId: firedRuleId,
     breakdown,
     policySnapshot: input.policySnapshot,
+    sellPolicySnapshot:
+      input.policySnapshot === null ? null : sellPolicyFor(input.policySnapshot, breakdown, sell),
     expiresAt: input.expiresAt,
   };
+}
+
+/**
+ * Scaling basis for the sell-side policy (review H1): the net figure minted
+ * in the SAME currency as the policy's penalties — the pre-FX supplier net
+ * when a stored rate applied, otherwise the sell-currency net basis. A
+ * penalty currency matching neither is a normalization bug.
+ */
+function sellPolicyFor(
+  policy: CancellationPolicy,
+  breakdown: PriceBreakdown,
+  sell: PriceResolution["sell"],
+): CancellationPolicy {
+  const penaltyCurrency = policy.rules[0]?.penalty.currency ?? breakdown.net.currency;
+  const basis =
+    breakdown.fx !== null && breakdown.fx.supplierNet.currency === penaltyCurrency
+      ? breakdown.fx.supplierNet
+      : breakdown.net;
+  return toSellCancellationPolicy(policy, basis, sell);
 }

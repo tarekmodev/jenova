@@ -208,9 +208,10 @@ export class HotelBookingController {
           sell: { amount: moneyAmountFrom(item.sellAmount, "sell_amount"), currency: item.currency },
           cancellationRequestedAt: item.cancellationRequestedAt?.toISOString() ?? null,
           escalated: item.escalatedAt !== null,
-          // The stored normalized snapshot — what the fee preview resolves
-          // against; display data for the portal's policy timeline (#98).
-          policy: item.policySnapshot,
+          // SELL-side snapshot — the only policy the agency realm may see
+          // (review H1: net penalties disclose the tenant's buy rate); the
+          // fee preview resolves against this same view.
+          policy: this.service.agencyPolicyOf(item),
         },
         history: history.map((entry) => ({
           action: entry.action,

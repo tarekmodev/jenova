@@ -113,7 +113,14 @@ export interface CreateHotelBookingInput {
   readonly offerId: string | null;
   readonly net: Money;
   readonly sell: Money;
+  /** NET-side policy — settlement/ledger truth. */
   readonly policySnapshot: CancellationPolicy;
+  /**
+   * SELL-side policy for agency-facing display (PR #107 review H1: net
+   * penalty amounts are commercially confidential). Nullable while
+   * pre-0007 offers drain; readers derive a sell-side view for null rows.
+   */
+  readonly sellPolicySnapshot: CancellationPolicy | null;
   /**
    * Holder + per-room guest names, captured on the item at creation — the
    * only durable home for this data (vouchers/delivery read it long after
@@ -191,6 +198,7 @@ export class BookingTransitionRunner {
           sellAmount: BigInt(input.sell.amount),
           currency: input.sell.currency,
           policySnapshot: input.policySnapshot,
+          sellPolicySnapshot: input.sellPolicySnapshot,
           ...(input.guests === undefined ? {} : { guests: input.guests }),
         })
         .returning();

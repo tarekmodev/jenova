@@ -41,6 +41,11 @@ export async function POST(request: NextRequest): Promise<Response> {
     sameSite: "lax",
     path: "/",
     maxAge: maxAgeSeconds,
+    // Secure outside an EXPLICIT development env — same fail-closed posture
+    // as the engine's resolveNodeEnv (unset/typo'd NODE_ENV = production).
+    // Browsers still accept Secure cookies on localhost/loopback, so local
+    // production builds (and the e2e harness) keep working over http.
+    secure: process.env.NODE_ENV !== "development",
   });
   return response;
 }

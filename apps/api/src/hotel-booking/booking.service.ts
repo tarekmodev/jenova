@@ -52,6 +52,7 @@ import {
 } from "@jenova/booking-engine";
 import { auditEvents, bookingItems, bookings, type TenantDbResolver } from "@jenova/db";
 import { and, desc, eq } from "drizzle-orm";
+import { toSellCancellationPolicy } from "../pricing/sell-policy";
 import type { SupplierCredentialsSource, SupplierRegistry } from "@jenova/supplier-registry";
 import { OfferError, SupplierUnavailableError } from "../offers/errors";
 import type { OffersService, VerifiedOffer } from "../offers/offers.service";
@@ -203,6 +204,11 @@ export class HotelBookingService {
       net: offer.net,
       sell: offer.sell,
       policySnapshot: policy,
+      // Agency-facing twin (review H1). Offers minted since 0007 carry it;
+      // the derivation covers offers issued during the N−1 window.
+      sellPolicySnapshot:
+        offer.sellPolicySnapshot ??
+        toSellCancellationPolicy(policy, offer.breakdown.fx?.supplierNet ?? offer.net, offer.sell),
       // Durable snapshot for documents/delivery (0005): after book() returns
       // this is the only home the holder's email and guest names have.
       guests: { holder: input.holder, rooms: input.rooms },
@@ -363,7 +369,15 @@ export class HotelBookingService {
     // pending_confirmation item concurrently) — settle against the FRESH
     // state, never the pre-call snapshot (review M1).
     if (record.status === "cancelled") {
-      const state = await this.settleSupplierCancelled(tenant, item.id, scope.actor, now, preview);
+      // Ledger postings take the NET-resolved penalty (supplier truth);
+      // `preview` above stays the agency-facing sell-side view.
+      const state = await this.settleSupplierCancelled(
+        tenant,
+        item.id,
+        scope.actor,
+        now,
+        this.netPenaltyAt(item, now),
+      );
       return {
         bookingId: booking.id,
         bookingItemId: item.id,
@@ -424,7 +438,7 @@ export class HotelBookingService {
     bookingItemId: string,
     actor: AuditActor,
     requestedAt: Date,
-    preview: CancellationPreview,
+    netPenalty: Money,
   ): Promise<BookingItemState> {
     const db = await this.resolver.getTenantDb(tenant);
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -445,7 +459,7 @@ export class HotelBookingService {
           actor,
           reason: "supplier cancelled the booking",
           patch: { cancellationRequestedAt: requestedAt },
-          penalty: preview.penalty.amount === 0 ? null : preview.penalty,
+          penalty: netPenalty.amount === 0 ? null : netPenalty,
         });
         return "cancelled";
       } catch (error) {
@@ -653,12 +667,41 @@ export class HotelBookingService {
     });
   }
 
+  /**
+   * AGENCY-FACING preview (review H1): penalty and refund resolve against
+   * the SELL-side policy, so refund = sell − sellPenalty is coherent and no
+   * net-derived Money reaches the agency realm. The ledger's penalty stays
+   * net-resolved — see {@link netPenaltyAt}.
+   */
   private buildPreview(item: BookingItemRow, at: Date): CancellationPreview {
-    const policy = item.policySnapshot;
+    const policy = this.agencyPolicyOf(item);
     const penalty = resolvePenaltyAt(policy, at) ?? zero(item.currency);
     const sell: Money = { amount: moneyAmountFrom(item.sellAmount, "sell_amount"), currency: item.currency };
     const refund = penalty.currency === sell.currency ? subtract(sell, penalty) : null;
     return { penalty, refund, refundable: policy.refundable, asOf: at };
+  }
+
+  /**
+   * The SELL-side policy for agency display: the stored 0007 snapshot, or a
+   * derivation from the net snapshot + persisted amounts for pre-0007 rows
+   * (expand-contract: same pure scaling the offer path applies).
+   */
+  agencyPolicyOf(item: BookingItemRow): CancellationPolicy {
+    if (item.sellPolicySnapshot !== null) {
+      return item.sellPolicySnapshot;
+    }
+    const net: Money = { amount: moneyAmountFrom(item.netAmount, "net_amount"), currency: item.currency };
+    const sell: Money = { amount: moneyAmountFrom(item.sellAmount, "sell_amount"), currency: item.currency };
+    return toSellCancellationPolicy(item.policySnapshot, net, sell);
+  }
+
+  /**
+   * Supplier-truth penalty for LEDGER postings (booking-engine templates
+   * pass the supplier penalty through 1:1 on every leg — supplier_payable
+   * must stay net; review H1 explicitly keeps this unchanged).
+   */
+  private netPenaltyAt(item: BookingItemRow, at: Date): Money {
+    return resolvePenaltyAt(item.policySnapshot, at) ?? zero(item.currency);
   }
 
   private assertCancellable(item: BookingItemRow): void {

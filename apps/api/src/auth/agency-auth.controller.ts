@@ -11,6 +11,11 @@
  * email, wrong password, unset credential, suspended user or agency are
  * indistinguishable (no oracle), and a dummy argon2id verification keeps the
  * unknown-email path on the same clock as the wrong-password path.
+ *
+ * RATE LIMITING: the gateway's rate-limit stage is still the M0 no-op, so
+ * this password endpoint is unthrottled (and each guess costs an argon2id
+ * verify). Per-realm rate limiting + lockout are tracked in issue #109 and
+ * MUST land before any internet-facing exposure (docs/08-security.md).
  */
 
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Post, Req } from "@nestjs/common";

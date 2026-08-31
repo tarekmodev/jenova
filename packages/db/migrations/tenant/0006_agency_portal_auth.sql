@@ -1,4 +1,4 @@
--- 0005_agency_portal_auth — Agent Portal login + per-agency search defaults
+-- 0006_agency_portal_auth — Agent Portal login + per-agency search defaults
 -- (M2 issue #95; docs/apps/b2b.md "Agent Portal").
 --
 -- EXPAND-ONLY (CLAUDE.md rule 1): nullable columns on existing tables; code
