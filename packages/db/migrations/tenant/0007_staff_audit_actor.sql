@@ -1,4 +1,4 @@
--- 0006_staff_audit_actor — EXPAND-ONLY (widens one check constraint).
+-- 0007_staff_audit_actor — EXPAND-ONLY (widens one check constraint).
 --
 -- Tenant staff act from the Internal Dashboard from M2 on (settings
 -- changes, manual-intervention actions) and their audit events carry

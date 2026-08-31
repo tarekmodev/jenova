@@ -23,10 +23,13 @@ import {
   UnboundSupplierCredentialsSource,
 } from "@jenova/supplier-registry";
 import { loadWorkerConfig, WorkerConfigError } from "./config";
+import { createDocumentDeliverySweep } from "./document-delivery";
 import { createPendingSweep } from "./pending-sweep";
 
 export const PENDING_QUEUE_NAME = "booking-pending";
 export const PENDING_SWEEP_JOB = "pending-sweep";
+export const DOCUMENTS_QUEUE_NAME = "document-delivery";
+export const DOCUMENTS_SWEEP_JOB = "document-delivery-sweep";
 
 async function bootstrap(): Promise<void> {
   // Node 22 native .env loading — local dev only; staging/production inject
@@ -80,12 +83,69 @@ async function bootstrap(): Promise<void> {
     console.error(`[worker] job ${job?.name ?? "?"} failed:`, error.message);
   });
 
+  // Documents delivery (M2 #100): confirm-event → voucher render → email.
+  let documentsQueue: Queue | null = null;
+  let documentsWorker: Worker | null = null;
+  if (config.documentsDelivery !== null) {
+    const deliverySweep = createDocumentDeliverySweep({
+      controlPlane,
+      resolver,
+      runner,
+      config: config.documentsDelivery,
+    });
+    documentsQueue = new Queue(DOCUMENTS_QUEUE_NAME, { connection });
+    await documentsQueue.upsertJobScheduler(
+      DOCUMENTS_SWEEP_JOB,
+      { every: config.documentsDelivery.intervalMs },
+      { name: DOCUMENTS_SWEEP_JOB },
+    );
+    documentsWorker = new Worker(
+      DOCUMENTS_QUEUE_NAME,
+      async () => {
+        const report = await deliverySweep();
+        const activity = report.perTenant.reduce(
+          (sum, t) => sum + t.report.claimed + t.report.sent + t.report.retried + t.report.failed,
+          0,
+        );
+        if (activity > 0 || report.failures.length > 0) {
+          const totals = report.perTenant.reduce(
+            (acc, t) => ({
+              sent: acc.sent + t.report.sent,
+              retried: acc.retried + t.report.retried,
+              failed: acc.failed + t.report.failed,
+            }),
+            { sent: 0, retried: 0, failed: 0 },
+          );
+          console.log(
+            `[worker] document delivery: ${String(totals.sent)} sent, ` +
+              `${String(totals.retried)} retrying, ${String(totals.failed)} terminal`,
+          );
+          for (const failure of report.failures) {
+            console.error(`[worker] tenant ${failure.tenantId}: ${failure.error}`);
+          }
+        }
+        return report;
+      },
+      { connection, concurrency: 1 },
+    );
+    documentsWorker.on("failed", (job, error) => {
+      console.error(`[worker] job ${job?.name ?? "?"} failed:`, error.message);
+    });
+  } else {
+    console.log("[worker] documents delivery disabled (S3/SMTP not configured)");
+  }
+
   console.log(
-    `[worker] up — ${PENDING_QUEUE_NAME} sweep every ${String(config.pendingSweepIntervalMs)}ms`,
+    `[worker] up — ${PENDING_QUEUE_NAME} sweep every ${String(config.pendingSweepIntervalMs)}ms` +
+      (config.documentsDelivery === null
+        ? ""
+        : `, ${DOCUMENTS_QUEUE_NAME} sweep every ${String(config.documentsDelivery.intervalMs)}ms`),
   );
 
   const shutdown = async (signal: string): Promise<void> => {
     console.log(`[worker] ${signal} — shutting down`);
+    await documentsWorker?.close();
+    await documentsQueue?.close();
     await worker.close();
     await queue.close();
     connection.disconnect();

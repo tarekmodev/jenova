@@ -90,6 +90,7 @@ describe.skipIf(!available)("staff settings integration (real db + replay)", () 
       hotelSearchBudgetMs: 8_000,
       dataKey: Buffer.alloc(32, 5).toString("base64"),
       dataKeyId: "test-v1",
+      documents: null,
     });
     const testingModule = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(API_CONFIG)

@@ -48,6 +48,9 @@ export interface StoredOffer {
   readonly pricingContext: PricingContext | null;
   readonly checkedAt: Date | null;
   readonly invalidatedAt: Date | null;
+  /** Hotel display facts (0005) — null on pre-0005 rows and non-hotel verticals. */
+  readonly boardBasis: string | null;
+  readonly supplierRoomName: string | null;
 }
 
 /** A complete new offer — every offer-store field required at write time. */
@@ -69,6 +72,9 @@ export interface NewOfferRecord {
   readonly pricingContext: PricingContext;
   /** Non-null when the offer is born checked (a `check` successor row). */
   readonly checkedAt: Date | null;
+  /** Hotel display facts (0005): canonical BoardBasis + verbatim room name. */
+  readonly boardBasis: string | null;
+  readonly supplierRoomName: string | null;
 }
 
 export interface OfferStore {
@@ -133,6 +139,8 @@ function toStoredOffer(row: OfferRow): StoredOffer {
     pricingContext: row.pricingContext as unknown as PricingContext | null,
     checkedAt: row.checkedAt,
     invalidatedAt: row.invalidatedAt,
+    boardBasis: row.boardBasis,
+    supplierRoomName: row.supplierRoomName,
   };
 }
 
@@ -155,6 +163,8 @@ function toInsertRow(record: NewOfferRecord): OfferInsert {
     breakdown: record.breakdown as unknown as Record<string, unknown>,
     pricingContext: record.pricingContext as unknown as Record<string, unknown>,
     checkedAt: record.checkedAt,
+    boardBasis: record.boardBasis,
+    supplierRoomName: record.supplierRoomName,
   };
 }
 

@@ -1,28 +1,26 @@
 {
-  "name": "@jenova/worker",
+  "name": "@jenova/documents",
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
-    "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.940.0",
     "@jenova/booking-engine": "workspace:*",
     "@jenova/db": "workspace:*",
-    "@jenova/documents": "workspace:*",
     "@jenova/domain": "workspace:*",
-    "@jenova/supplier-registry": "workspace:*",
-    "@jenova/supplier-sdk": "workspace:*",
-    "bullmq": "^5.66.5",
     "drizzle-orm": "^0.45.2",
-    "ioredis": "^5.9.3",
-    "zod": "^4.1.12"
+    "nodemailer": "^6.10.0"
   },
   "devDependencies": {
     "@types/node": "^22.18.0",
-    "tsx": "^4.20.0",
+    "@types/nodemailer": "^6.4.17",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

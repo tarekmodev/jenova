@@ -1,4 +1,4 @@
--- 0005_tenant_staff — EXPAND-ONLY (two new tables; nothing existing changes).
+-- 0006_tenant_staff — EXPAND-ONLY (two new tables; nothing existing changes).
 --
 -- Tenant staff for the Internal Dashboard (tenant_staff realm, docs/08):
 -- per-tenant user store with argon2id password hashes and TOTP secrets

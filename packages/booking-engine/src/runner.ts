@@ -27,6 +27,7 @@ import {
   bookingItems,
   bookings,
   type AuditActorType,
+  type BookingGuestsSnapshot,
   type TenantDbResolver,
 } from "@jenova/db";
 import { BookingItemNotFoundError, BookingNotFoundError, TransitionConflictError } from "./errors";
@@ -113,6 +114,12 @@ export interface CreateHotelBookingInput {
   readonly net: Money;
   readonly sell: Money;
   readonly policySnapshot: CancellationPolicy;
+  /**
+   * Holder + per-room guest names, captured on the item at creation — the
+   * only durable home for this data (vouchers/delivery read it long after
+   * the supplier call). Optional: non-hotel flows may not carry it yet.
+   */
+  readonly guests?: BookingGuestsSnapshot;
   readonly actor: AuditActor;
 }
 
@@ -184,6 +191,7 @@ export class BookingTransitionRunner {
           sellAmount: BigInt(input.sell.amount),
           currency: input.sell.currency,
           policySnapshot: input.policySnapshot,
+          ...(input.guests === undefined ? {} : { guests: input.guests }),
         })
         .returning();
       if (item === undefined) {

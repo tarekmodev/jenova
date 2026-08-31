@@ -50,7 +50,72 @@ const apiEnvSchema = z.object({
     })
     .optional(),
   JENOVA_DATA_KEY_ID: z.string().min(1).default("env-v1"),
+  // --- Documents v1 (M2 #99): object store for rendered PDFs + Typst -----
+  // The S3 block is all-or-nothing: fully set → documents enabled; fully
+  // unset → the voucher endpoint answers documents_unavailable; partial →
+  // fail fast (a half-configured store must never boot quietly).
+  S3_ENDPOINT: z.url().optional(),
+  S3_REGION: z.string().min(1).optional(),
+  S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+  S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  S3_BUCKET: z.string().min(1).optional(),
+  S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("false"),
+  DOCUMENTS_TYPST_BIN: z.string().min(1).default("typst"),
 });
+
+export interface DocumentsConfig {
+  readonly s3: {
+    readonly endpoint: string;
+    readonly region: string;
+    readonly accessKeyId: string;
+    readonly secretAccessKey: string;
+    readonly bucket: string;
+    readonly forcePathStyle: boolean;
+  };
+  readonly typstBin: string;
+}
+
+const S3_KEYS = [
+  "S3_ENDPOINT",
+  "S3_REGION",
+  "S3_ACCESS_KEY_ID",
+  "S3_SECRET_ACCESS_KEY",
+  "S3_BUCKET",
+] as const;
+
+interface DocumentsEnvSlice {
+  readonly S3_ENDPOINT?: string | undefined;
+  readonly S3_REGION?: string | undefined;
+  readonly S3_ACCESS_KEY_ID?: string | undefined;
+  readonly S3_SECRET_ACCESS_KEY?: string | undefined;
+  readonly S3_BUCKET?: string | undefined;
+  readonly S3_FORCE_PATH_STYLE: "true" | "false";
+  readonly DOCUMENTS_TYPST_BIN: string;
+}
+
+/** All-or-nothing S3 block: fully set, fully unset, or fail fast. */
+export function resolveDocumentsConfig(parsed: DocumentsEnvSlice): DocumentsConfig | null {
+  const missing = S3_KEYS.filter((key) => parsed[key] === undefined);
+  if (missing.length === S3_KEYS.length) {
+    return null;
+  }
+  if (missing.length > 0) {
+    throw new ApiConfigError(
+      missing.map((key) => `${key}: required when any S3_* variable is set (all-or-nothing)`),
+    );
+  }
+  return {
+    s3: {
+      endpoint: parsed.S3_ENDPOINT as string,
+      region: parsed.S3_REGION as string,
+      accessKeyId: parsed.S3_ACCESS_KEY_ID as string,
+      secretAccessKey: parsed.S3_SECRET_ACCESS_KEY as string,
+      bucket: parsed.S3_BUCKET as string,
+      forcePathStyle: parsed.S3_FORCE_PATH_STYLE === "true",
+    },
+    typstBin: parsed.DOCUMENTS_TYPST_BIN,
+  };
+}
 
 export interface ApiConfig {
   readonly nodeEnv: NodeEnv;
@@ -63,6 +128,8 @@ export interface ApiConfig {
   /** null = sealed-secret features refuse loudly on use (never a silent fallback). */
   readonly dataKey: string | null;
   readonly dataKeyId: string;
+  /** Null = documents disabled (no S3 block configured). */
+  readonly documents: DocumentsConfig | null;
 }
 
 /** Nest injection token for the loaded {@link ApiConfig}. */
@@ -97,5 +164,6 @@ export function loadApiConfig(env: Readonly<Record<string, string | undefined>>)
     hotelSearchBudgetMs: parsed.data.HOTEL_SEARCH_BUDGET_MS,
     dataKey: parsed.data.JENOVA_DATA_KEY ?? null,
     dataKeyId: parsed.data.JENOVA_DATA_KEY_ID,
+    documents: resolveDocumentsConfig(parsed.data),
   });
 }

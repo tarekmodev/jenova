@@ -32,6 +32,7 @@ const testConfig: ApiConfig = Object.freeze({
   hotelSearchBudgetMs: 8_000,
   dataKey: Buffer.alloc(32, 7).toString("base64"),
   dataKeyId: "test-v1",
+  documents: null,
 });
 
 const KNOWN_HOST = "tenant-one.example.test";

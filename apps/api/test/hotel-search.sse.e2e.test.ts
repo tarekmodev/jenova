@@ -44,6 +44,7 @@ const testConfig: ApiConfig = Object.freeze({
   hotelSearchBudgetMs: 8_000,
   dataKey: null,
   dataKeyId: "env-v1",
+  documents: null,
 });
 
 const KNOWN_HOST = "tenant-one.example.test";

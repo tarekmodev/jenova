@@ -63,6 +63,7 @@ test.describe("internal dashboard", () => {
   let dir: string;
 
   // Playwright demands a destructured first arg; browserName is unused.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   test.beforeAll(({ browserName: _browserName }, testInfo) => {
     locale = testInfo.project.name;
     messages = catalog(locale);
@@ -236,7 +237,9 @@ test.describe("internal dashboard", () => {
     const item = page.locator('[data-testid="escalation-item"]').first();
     await expect(item).toBeVisible();
     await expect(item.getByText(/manual intervention required/)).toBeVisible();
-    await expect(item.getByText(message(messages, "workspace.queue.age"))).toBeVisible();
+    // "<age label>:" — the colon keeps this off the reason text, which in
+    // English also contains the word "age".
+    await expect(item.getByText(`${message(messages, "workspace.queue.age")}:`)).toBeVisible();
     await shot(page, "09-queue");
 
     // ONE forced poll through the runner: the replayed BookingDetail says
